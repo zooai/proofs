@@ -44,13 +44,20 @@ theorem insufficient_balance_fails (s : TokenState) (from_ to_ amount : Nat)
     transfer s from_ to_ amount = none := by
   simp [transfer, Nat.not_le.mpr h]
 
-/-- TOTAL SUPPLY CONSERVATION: transfer doesn't change total supply -/
+/-- **Theorem (supply conservation):** a successful `transfer` never
+    changes the total supply. `transfer` only modifies two balance
+    entries symmetrically and copies `totalSupply` unchanged. -/
 theorem transfer_preserves_supply (s s' : TokenState) (from_ to_ amount : Nat)
-    (h : transfer s from_ to_ amount = some s')
-    (h_diff : from_ ≠ to_) :
+    (h : transfer s from_ to_ amount = some s') :
     s'.totalSupply = s.totalSupply := by
-  simp [transfer] at h
-  split at h <;> simp_all
+  unfold transfer at h
+  by_cases hb : s.balances from_ ≥ amount
+  · rw [if_pos hb] at h
+    -- Option.some.inj gives the record equality; read off totalSupply.
+    injection h with h'
+    rw [← h']
+  · rw [if_neg hb] at h
+    exact absurd h (by simp)
 
 /-- TransferFrom: requires allowance -/
 def transferFrom (s : TokenState) (owner spender to_ amount : Nat) : Option TokenState :=
