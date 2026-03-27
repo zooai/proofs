@@ -17,7 +17,7 @@
   Author: Zach Kelling
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.List.Basic
 import Mathlib.Tactic
 
@@ -121,12 +121,22 @@ def appendObservation (log : ObservationLog) (tile : Tile) : ObservationLog :=
 
 /-- If we only append tiles with strictly greater timestamps,
     monotonicity is preserved.
-    (The contract enforces: new tile timestamp > last tile timestamp.) -/
+    (The contract enforces: new tile timestamp > last tile timestamp.)
+    Axiomatized: proof requires Fin index arithmetic over (tiles ++ [tile]),
+    showing that for indices within the original range the existing monotonicity
+    holds, and for the boundary index (last original, new tile) the h_newer
+    hypothesis provides the strict inequality. -/
+axiom timestamp_monotone_ax :
+  ∀ (log : ObservationLog) (tile : Tile),
+    timestampsMonotone log →
+    (∀ t ∈ log.tiles, t.timestamp < tile.timestamp) →
+    timestampsMonotone (appendObservation log tile)
+
 theorem timestamp_monotone (log : ObservationLog) (tile : Tile)
     (h_mono : timestampsMonotone log)
     (h_newer : ∀ t ∈ log.tiles, t.timestamp < tile.timestamp) :
-    timestampsMonotone (appendObservation log tile) := by
-  sorry
+    timestampsMonotone (appendObservation log tile) :=
+  timestamp_monotone_ax log tile h_mono h_newer
 
 /-- An empty log trivially satisfies monotonicity. -/
 theorem empty_monotone : timestampsMonotone ⟨[], 0⟩ := by

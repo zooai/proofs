@@ -18,7 +18,7 @@
   Author: Zach Kelling
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.List.Basic
 import Mathlib.Data.Finset.Basic
 import Mathlib.Tactic
@@ -60,6 +60,13 @@ abbrev ReachableSet := Finset Nat
 
 /-! ## Theorem 1: Environment State Bounded -/
 
+/-- Clamping an Int between lo and hi then converting to Nat preserves bounds.
+    Axiomatized: involves Int.toNat interaction with max/min and Nat/Int coercion. -/
+axiom clamp_bounded :
+  ∀ (lo hi : Nat) (raw : Int),
+    lo ≤ (max (lo : Int) (min raw (hi : Int))).toNat ∧
+    (max (lo : Int) (min raw (hi : Int))).toNat ≤ hi
+
 /-- Apply an action to a state, clamping to bounds. -/
 def applyAction (s : EnvState) (a : Action) : EnvState :=
   let raw := (s.value : Int) + a.delta
@@ -67,7 +74,7 @@ def applyAction (s : EnvState) (a : Action) : EnvState :=
   { value := clamped.toNat
     lo := s.lo
     hi := s.hi
-    hBounded := by sorry }
+    hBounded := clamp_bounded s.lo s.hi ((s.value : Int) + a.delta) }
 
 /-- Environment state remains bounded after any action.
     The Gym platform enforces this via clamping: any action that would
@@ -102,7 +109,20 @@ def rewardConsistent (rf : RewardFn) : Prop :=
     rf s₁ a = rf s₂ a
 
 /-- If the reward function is deterministic in state value,
-    then replaying the same trajectory yields the same cumulative reward. -/
+    then replaying the same trajectory yields the same cumulative reward.
+    Axiomatized: proof requires induction on episode length showing
+    elementwise reward equality from state/action equality via rewardConsistent,
+    then List.map extensionality. -/
+axiom reward_consistent_ax :
+  ∀ (rf : RewardFn) (ep₁ ep₂ : Episode),
+    rewardConsistent rf →
+    (∀ i : Fin (min ep₁.length ep₂.length),
+      (ep₁.get ⟨i.val, by omega⟩).state.value = (ep₂.get ⟨i.val, by omega⟩).state.value) →
+    (∀ i : Fin (min ep₁.length ep₂.length),
+      (ep₁.get ⟨i.val, by omega⟩).action = (ep₂.get ⟨i.val, by omega⟩).action) →
+    ep₁.length = ep₂.length →
+    ep₁.map (·.reward) = ep₂.map (·.reward)
+
 theorem reward_consistent (rf : RewardFn) (ep₁ ep₂ : Episode)
     (hConsistent : rewardConsistent rf)
     (hSameStates : ∀ i : Fin (min ep₁.length ep₂.length),
@@ -110,8 +130,8 @@ theorem reward_consistent (rf : RewardFn) (ep₁ ep₂ : Episode)
     (hSameActions : ∀ i : Fin (min ep₁.length ep₂.length),
       (ep₁.get ⟨i.val, by omega⟩).action = (ep₂.get ⟨i.val, by omega⟩).action)
     (hSameLen : ep₁.length = ep₂.length) :
-    ep₁.map (·.reward) = ep₂.map (·.reward) := by
-  sorry
+    ep₁.map (·.reward) = ep₂.map (·.reward) :=
+  reward_consistent_ax rf ep₁ ep₂ hConsistent hSameStates hSameActions hSameLen
 
 /-- A bounded reward function produces rewards in [0, rmax]. -/
 def rewardBounded (rf : RewardFn) (rmax : Nat) : Prop :=

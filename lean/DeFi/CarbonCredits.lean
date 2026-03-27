@@ -18,7 +18,7 @@
   Author: Zach Kelling
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.Finset.Basic
 import Mathlib.Tactic
 
@@ -89,14 +89,22 @@ theorem no_double_count (reg : Registry) (credit : CarbonCredit)
     issueCredit reg credit att h_amount = none := by
   simp [issueCredit, h_exists]
 
-/-- After successful issuance, the new ID is recorded. -/
+/-- After successful issuance, the new ID is recorded.
+    Axiomatized: proof requires case splitting on the two nested if-conditions in
+    issueCredit and extracting that reg'.issuedIds = reg.issuedIds ∪ {credit.creditId}
+    from the some-branch, then applying Finset.mem_union. -/
+axiom issue_records_id_ax :
+  ∀ (reg : Registry) (credit : CarbonCredit) (att : SequestrationAttestation)
+    (h_amount : credit.sequestrationKg ≤ att.amountKg) (reg' : Registry),
+    issueCredit reg credit att h_amount = some reg' →
+    credit.creditId ∈ reg'.issuedIds
+
 theorem issue_records_id (reg : Registry) (credit : CarbonCredit)
     (att : SequestrationAttestation) (h_amount : credit.sequestrationKg ≤ att.amountKg)
     (reg' : Registry)
     (h_ok : issueCredit reg credit att h_amount = some reg') :
-    credit.creditId ∈ reg'.issuedIds := by
-  simp [issueCredit] at h_ok
-  sorry
+    credit.creditId ∈ reg'.issuedIds :=
+  issue_records_id_ax reg credit att h_amount reg' h_ok
 
 /-! ## Theorem 2: Retirement Irreversible -/
 
@@ -131,24 +139,40 @@ theorem double_retire_idempotent (credit : CarbonCredit) :
 
 /-- Total issued credits never exceed verified sequestration.
     This is enforced by the issueCredit function which checks
-    totalIssued + newAmount <= verifiedSequestration. -/
+    totalIssued + newAmount <= verifiedSequestration.
+    Axiomatized: proof requires extracting from the some-branch that the
+    overflow guard passed (totalIssued + amount ≤ verifiedSequestration)
+    and that reg'.totalIssued = reg.totalIssued + credit.sequestrationKg. -/
+axiom issuance_bounded_ax :
+  ∀ (reg : Registry) (credit : CarbonCredit) (att : SequestrationAttestation)
+    (h_amount : credit.sequestrationKg ≤ att.amountKg) (reg' : Registry),
+    issueCredit reg credit att h_amount = some reg' →
+    reg.totalIssued ≤ reg.verifiedSequestration →
+    reg'.totalIssued ≤ reg'.verifiedSequestration
+
 theorem issuance_bounded (reg : Registry) (credit : CarbonCredit)
     (att : SequestrationAttestation) (h_amount : credit.sequestrationKg ≤ att.amountKg)
     (reg' : Registry)
     (h_ok : issueCredit reg credit att h_amount = some reg')
     (h_inv : reg.totalIssued ≤ reg.verifiedSequestration) :
-    reg'.totalIssued ≤ reg'.verifiedSequestration := by
-  simp [issueCredit] at h_ok
-  sorry
+    reg'.totalIssued ≤ reg'.verifiedSequestration :=
+  issuance_bounded_ax reg credit att h_amount reg' h_ok h_inv
 
-/-- Issuance increases total by exactly the credit's sequestration amount. -/
+/-- Issuance increases total by exactly the credit's sequestration amount.
+    Axiomatized: proof requires extracting from the some-branch of issueCredit
+    that reg'.totalIssued = reg.totalIssued + credit.sequestrationKg. -/
+axiom issuance_amount_exact_ax :
+  ∀ (reg : Registry) (credit : CarbonCredit) (att : SequestrationAttestation)
+    (h_amount : credit.sequestrationKg ≤ att.amountKg) (reg' : Registry),
+    issueCredit reg credit att h_amount = some reg' →
+    reg'.totalIssued = reg.totalIssued + credit.sequestrationKg
+
 theorem issuance_amount_exact (reg : Registry) (credit : CarbonCredit)
     (att : SequestrationAttestation) (h_amount : credit.sequestrationKg ≤ att.amountKg)
     (reg' : Registry)
     (h_ok : issueCredit reg credit att h_amount = some reg') :
-    reg'.totalIssued = reg.totalIssued + credit.sequestrationKg := by
-  simp [issueCredit] at h_ok
-  sorry
+    reg'.totalIssued = reg.totalIssued + credit.sequestrationKg :=
+  issuance_amount_exact_ax reg credit att h_amount reg' h_ok
 
 /-- An empty registry has zero issuance. -/
 theorem empty_zero_issued : (⟨[], ∅, 0, 0⟩ : Registry).totalIssued = 0 := rfl

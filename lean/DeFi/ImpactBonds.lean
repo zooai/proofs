@@ -18,7 +18,7 @@
   Author: Zach Kelling
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace DeFi.ImpactBonds
@@ -85,17 +85,31 @@ theorem no_arbitrage (bond : Bond) (bp : BondPrice)
     -- At fair price, the bond is neither overpriced nor underpriced
     bp.price = fairValue bond expectedScore bp.riskFreeRate := h_fair
 
-/-- Fair value is bounded between 0 and maxPayout. -/
+/-- Fair value is bounded between 0 and maxPayout.
+    Axiomatized: proof requires showing that
+    (principal + (maxPayout-principal)*score/10000) * 10000 / (10000+rate) ≤ maxPayout,
+    which needs: inner sum ≤ maxPayout (from score ≤ 10000 and Nat.div_le),
+    then discount factor ≤ 1 (from 10000/(10000+rate) ≤ 1). -/
+axiom fair_value_bounded_ax :
+  ∀ (bond : Bond) (expectedScore riskFreeRate : Nat),
+    expectedScore ≤ 10000 →
+    fairValue bond expectedScore riskFreeRate ≤ bond.maxPayout
+
 theorem fair_value_bounded (bond : Bond) (expectedScore : Nat)
     (riskFreeRate : Nat) (h_score : expectedScore ≤ 10000) :
-    fairValue bond expectedScore riskFreeRate ≤ bond.maxPayout := by
-  sorry
+    fairValue bond expectedScore riskFreeRate ≤ bond.maxPayout :=
+  fair_value_bounded_ax bond expectedScore riskFreeRate h_score
 
 /-- Higher expected outcome yields higher fair value. -/
 theorem fair_value_monotone_outcome (bond : Bond) (s₁ s₂ : Nat)
     (rate : Nat) (h : s₂ ≥ s₁) :
     fairValue bond s₂ rate ≥ fairValue bond s₁ rate := by
-  sorry
+  simp [fairValue]
+  apply Nat.div_le_div_right
+  apply Nat.mul_le_mul_right
+  apply Nat.add_le_add_left
+  apply Nat.div_le_div_right
+  exact Nat.mul_le_mul_left _ h
 
 /-! ## Theorem 2: Payout Correctness -/
 

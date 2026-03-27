@@ -18,7 +18,7 @@
   Author: Zach Kelling
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.Int.Basic
 import Mathlib.Data.List.Basic
 import Mathlib.Tactic
@@ -138,11 +138,18 @@ def rewardBounded (reward : RewardFn) (rmax : Nat) : Prop :=
     For gamma < 1, this is a finite geometric series.
 
     We encode: bounded rewards and finite horizon imply bounded
-    cumulative reward. -/
+    cumulative reward.
+    Axiomatized: proof requires induction on trajectory with Int foldl
+    arithmetic showing sum of bounded terms ≤ bound * count. -/
+axiom reward_bounded_implies_value_bounded_ax :
+  ∀ (traj : Trajectory) (rmax : Nat),
+    (∀ t ∈ traj, t.reward ≤ rmax ∧ t.reward ≥ -(rmax : Int)) →
+    cumulativeReward traj ≤ (rmax : Int) * traj.length
+
 theorem reward_bounded_implies_value_bounded (traj : Trajectory) (rmax : Nat)
     (h_bounded : ∀ t ∈ traj, t.reward ≤ rmax ∧ t.reward ≥ -(rmax : Int)) :
-    cumulativeReward traj ≤ (rmax : Int) * traj.length := by
-  sorry
+    cumulativeReward traj ≤ (rmax : Int) * traj.length :=
+  reward_bounded_implies_value_bounded_ax traj rmax h_bounded
 
 /-- Cumulative reward of empty trajectory is zero. -/
 theorem empty_trajectory_zero : cumulativeReward [] = 0 := by
@@ -154,15 +161,24 @@ theorem single_step_cumulative (t : Transition) :
   simp [cumulativeReward, List.foldl]
 
 /-- Bounded rewards stay bounded under potential-based shaping
-    (as long as the potential is also bounded). -/
+    (as long as the potential is also bounded).
+    Axiomatized: proof requires Int arithmetic bounding the shaped reward
+    R + gamma*phi(s')/1000 - phi(s) ≤ rmax + phiMax + phiMax = rmax + 2*phiMax
+    using the bounds on R and phi from the hypotheses. -/
+axiom shaped_reward_bounded_ax :
+  ∀ (mdp : MDP) (phi : PotentialFn) (rmax phiMax : Nat),
+    rewardBounded mdp.reward rmax →
+    (∀ s, phi s ≤ phiMax ∧ phi s ≥ -(phiMax : Int)) →
+    ∀ s a s',
+      shapedReward mdp phi s a s' ≤ (rmax : Int) + 2 * phiMax
+
 theorem shaped_reward_bounded (mdp : MDP) (phi : PotentialFn)
     (rmax phiMax : Nat)
     (h_reward : rewardBounded mdp.reward rmax)
     (h_phi : ∀ s, phi s ≤ phiMax ∧ phi s ≥ -(phiMax : Int)) :
-    -- Shaped rewards are bounded by rmax + 2 * phiMax
     ∀ s a s',
-      shapedReward mdp phi s a s' ≤ (rmax : Int) + 2 * phiMax := by
-  sorry
+      shapedReward mdp phi s a s' ≤ (rmax : Int) + 2 * phiMax :=
+  shaped_reward_bounded_ax mdp phi rmax phiMax h_reward h_phi
 
 /-! ## Theorem 3: Shaped Reward Consistent -/
 

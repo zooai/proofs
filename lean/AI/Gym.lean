@@ -16,7 +16,7 @@
   - Cross-domain: experiences transfer across tasks
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.List.Basic
 import Mathlib.Tactic
 

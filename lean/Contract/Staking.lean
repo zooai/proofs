@@ -16,7 +16,7 @@
   - No dilution: minting LSDs doesn't reduce existing holders' value
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace Contract.Staking

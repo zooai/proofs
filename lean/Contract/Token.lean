@@ -14,7 +14,7 @@
   - TransferFrom requires sufficient allowance
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace Contract.Token

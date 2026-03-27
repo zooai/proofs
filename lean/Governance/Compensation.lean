@@ -19,7 +19,7 @@
   - Conservation: payouts ≤ treasury balance
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace Governance.Compensation

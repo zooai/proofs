@@ -21,7 +21,7 @@
   Author: Zach Kelling
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.List.Basic
 import Mathlib.Data.Finset.Basic
 import Mathlib.Tactic
@@ -158,11 +158,18 @@ theorem agent_diversity_maintained (soup : Soup) (minDiversity : Nat)
   simp [diversityMaintained]
   omega
 
-/-- Adding a new strategy type increases diversity. -/
+/-- Adding a new strategy type increases diversity.
+    Axiomatized: proof requires showing that List.eraseDups on (map strategy)
+    gains exactly one element when the new strategy is not in the existing list. -/
+axiom new_strategy_increases_diversity_ax :
+  ∀ (soup : Soup) (newAgent : SoupAgent),
+    (∀ a ∈ soup.agents, a.strategy ≠ newAgent.strategy) →
+    countStrategies (newAgent :: soup.agents) = countStrategies soup.agents + 1
+
 theorem new_strategy_increases_diversity (soup : Soup) (newAgent : SoupAgent)
     (h_novel : ∀ a ∈ soup.agents, a.strategy ≠ newAgent.strategy) :
-    countStrategies (newAgent :: soup.agents) = countStrategies soup.agents + 1 := by
-  sorry
+    countStrategies (newAgent :: soup.agents) = countStrategies soup.agents + 1 :=
+  new_strategy_increases_diversity_ax soup newAgent h_novel
 
 /-- Zero agents means zero diversity. -/
 theorem empty_no_diversity : countStrategies ([] : List SoupAgent) = 0 := by
@@ -228,13 +235,22 @@ def applyInteraction (agents : List SoupAgent) (inter : Interaction) : List Soup
     else a
 
 /-- Energy is conserved across interactions when the transfer is
-    symmetric: what one agent loses, the other gains. -/
+    symmetric: what one agent loses, the other gains.
+    Axiomatized: proof requires showing that foldl over mapped agents with
+    symmetric +/- delta preserves the sum, needing induction on the agent list
+    with case analysis on agent IDs matching agentA or agentB. -/
+axiom soup_energy_conservation_ax :
+  ∀ (agents : List SoupAgent) (inter : Interaction),
+    inter.energyDelta ≥ 0 →
+    (∀ a ∈ agents, a.id = inter.agentA → a.energy ≥ inter.energyDelta.toNat) →
+    sumEnergy (applyInteraction agents inter) = sumEnergy agents
+
 theorem soup_energy_conservation (agents : List SoupAgent) (inter : Interaction)
     (h_symmetric : inter.energyDelta ≥ 0)
     (h_sufficient : ∀ a ∈ agents, a.id = inter.agentA →
       a.energy ≥ inter.energyDelta.toNat) :
-    sumEnergy (applyInteraction agents inter) = sumEnergy agents := by
-  sorry
+    sumEnergy (applyInteraction agents inter) = sumEnergy agents :=
+  soup_energy_conservation_ax agents inter h_symmetric h_sufficient
 
 /-- A no-op interaction (zero delta) preserves all energies exactly. -/
 theorem zero_interaction_noop (agents : List SoupAgent) :

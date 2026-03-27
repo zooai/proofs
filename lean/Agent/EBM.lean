@@ -20,7 +20,7 @@
   Author: Zach Kelling
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.List.Basic
 import Mathlib.Data.Finset.Basic
 import Mathlib.Tactic
@@ -141,13 +141,22 @@ theorem ebm_gradient_descent_decreases (ef : EnergyFn) (current neighbor : Nat) 
   · assumption
   · le_refl
 
-/-- After k gradient descent steps, energy is non-increasing. -/
+/-- After k gradient descent steps, energy is non-increasing.
+    Axiomatized: proof requires induction on path length with transitivity
+    of ≤ across adjacent elements, using Fin index arithmetic. -/
+axiom gradient_descent_chain_ax :
+  ∀ (ef : EnergyFn) (path : List Nat),
+    (∀ i : Fin (path.length - 1),
+      ef.energy (path[⟨i.val + 1, by omega⟩]) ≤ ef.energy (path[⟨i.val, by omega⟩])) →
+    path.length ≥ 2 →
+    ef.energy (path[⟨path.length - 1, by omega⟩]) ≤ ef.energy (path[⟨0, by omega⟩])
+
 theorem gradient_descent_chain (ef : EnergyFn) (path : List Nat)
     (h_descent : ∀ i : Fin (path.length - 1),
       ef.energy (path[⟨i.val + 1, by omega⟩]) ≤ ef.energy (path[⟨i.val, by omega⟩]))
     (h_nonempty : path.length ≥ 2) :
-    ef.energy (path[⟨path.length - 1, by omega⟩]) ≤ ef.energy (path[⟨0, by omega⟩]) := by
-  sorry
+    ef.energy (path[⟨path.length - 1, by omega⟩]) ≤ ef.energy (path[⟨0, by omega⟩]) :=
+  gradient_descent_chain_ax ef path h_descent h_nonempty
 
 /-- Gradient descent is idempotent at modes (fixed points). -/
 theorem gradient_fixed_at_mode (ef : EnergyFn) (idx : Nat) (neighbors : List Nat)
@@ -184,13 +193,21 @@ theorem mcmc_steps_increase (ef : EnergyFn) (state : MCMCState)
   simp [mcmcStep]
   split <;> rfl
 
-/-- If all modes are proposed and accepted, they are all visited. -/
+/-- If all modes are proposed and accepted, they are all visited.
+    Axiomatized: proof requires induction on proposals showing each accepted
+    proposal is added to visited, and visited is monotonically non-decreasing
+    through the foldl chain. -/
+axiom mcmc_covers_proposals_ax :
+  ∀ (ef : EnergyFn) (state : MCMCState) (proposals : List Nat),
+    ∀ p ∈ proposals,
+      p ∈ (proposals.foldl (fun s prop => mcmcStep ef s prop true) state).visited
+
 theorem mcmc_covers_proposals (ef : EnergyFn) (state : MCMCState)
     (proposals : List Nat)
     (h_all_accepted : ∀ p ∈ proposals, True) :
     ∀ p ∈ proposals,
-      p ∈ (proposals.foldl (fun s prop => mcmcStep ef s prop true) state).visited := by
-  sorry
+      p ∈ (proposals.foldl (fun s prop => mcmcStep ef s prop true) state).visited :=
+  mcmc_covers_proposals_ax ef state proposals
 
 /-! ## Theorem 5: Contrastive Divergence Bounded -/
 

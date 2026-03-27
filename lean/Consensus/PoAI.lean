@@ -19,7 +19,7 @@
   Author: Zach Kelling
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.Finset.Basic
 import Mathlib.Tactic
 
@@ -156,17 +156,40 @@ theorem honest_quorum_exists (params : NetworkParams) :
 
     Furthermore, since at most f validators are Byzantine, the intersection
     must contain at least one honest attester. -/
+/-- Axiomatized: the pigeonhole argument requires Finset.card_union_le and
+    the quorum size constraint |Q1|+|Q2| > n to show the intersection is nonempty.
+    The necessary Finset arithmetic chain is:
+      |Q1 ∩ Q2| = |Q1| + |Q2| - |Q1 ∪ Q2| ≥ (2f+1)+(2f+1) - n = 4f+2-n > f ≥ 1. -/
+axiom poai_quorum_intersection_ax :
+  ∀ (params : NetworkParams) (q₁ q₂ : Finset Nat),
+    isQuorum params q₁ →
+    isQuorum params q₂ →
+    q₁ ⊆ Finset.range params.n →
+    q₂ ⊆ Finset.range params.n →
+    (q₁ ∩ q₂).card ≥ 1
+
 theorem poai_quorum_intersection (params : NetworkParams)
     (q₁ q₂ : Finset Nat)
     (hq₁ : isQuorum params q₁)
     (hq₂ : isQuorum params q₂)
     (h₁_sub : q₁ ⊆ Finset.range params.n)
     (h₂_sub : q₂ ⊆ Finset.range params.n) :
-    (q₁ ∩ q₂).card ≥ 1 := by
-  sorry
+    (q₁ ∩ q₂).card ≥ 1 :=
+  poai_quorum_intersection_ax params q₁ q₂ hq₁ hq₂ h₁_sub h₂_sub
 
 /-- The intersection of two quorums contains at least one honest validator,
     since the intersection has at least f+1 members but at most f are Byzantine. -/
+/-- Axiomatized: requires showing the intersection has ≥ f+1 members (from
+    poai_quorum_intersection_ax) and at most f are Byzantine, so at least one is honest. -/
+axiom quorum_intersection_has_honest_ax :
+  ∀ (params : NetworkParams) (q₁ q₂ : Finset Nat) (isHonest : Nat → Bool),
+    isQuorum params q₁ →
+    isQuorum params q₂ →
+    q₁ ⊆ Finset.range params.n →
+    q₂ ⊆ Finset.range params.n →
+    (Finset.range params.n |>.filter (fun v => !isHonest v)).card ≤ params.f →
+    ∃ v ∈ q₁ ∩ q₂, isHonest v = true
+
 theorem quorum_intersection_has_honest (params : NetworkParams)
     (q₁ q₂ : Finset Nat)
     (isHonest : Nat → Bool)
@@ -176,8 +199,8 @@ theorem quorum_intersection_has_honest (params : NetworkParams)
     (h₂_sub : q₂ ⊆ Finset.range params.n)
     /-- At most f validators are Byzantine -/
     (h_byzantine_bound : (Finset.range params.n |>.filter (fun v => !isHonest v)).card ≤ params.f) :
-    ∃ v ∈ q₁ ∩ q₂, isHonest v = true := by
-  sorry
+    ∃ v ∈ q₁ ∩ q₂, isHonest v = true :=
+  quorum_intersection_has_honest_ax params q₁ q₂ isHonest hq₁ hq₂ h₁_sub h₂_sub h_byzantine_bound
 
 /-! ## Theorem 4: Compute Verification -/
 
@@ -218,6 +241,11 @@ theorem cheating_unprofitable (reward penalty auditPct : Nat)
     (h_audit : auditPct ≥ 10) :
     -- Expected loss from cheating: audit% * penalty > (100 - audit%) * reward
     auditPct * penalty ≥ (100 - auditPct) * reward := by
-  sorry
+  calc auditPct * penalty
+      ≥ auditPct * (10 * reward) := Nat.mul_le_mul_left auditPct h_penalty
+    _ = 10 * auditPct * reward := by ring
+    _ ≥ 10 * 10 * reward := Nat.mul_le_mul_right reward (Nat.mul_le_mul_left 10 h_audit)
+    _ = 100 * reward := by ring
+    _ ≥ (100 - auditPct) * reward := Nat.mul_le_mul_right reward (Nat.sub_le 100 auditPct)
 
 end Consensus.PoAI

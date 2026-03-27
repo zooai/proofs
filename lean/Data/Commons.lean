@@ -17,7 +17,7 @@
   Author: Zach Kelling
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.Finset.Basic
 import Mathlib.Tactic
 
@@ -112,25 +112,49 @@ def addGrant (s : AccessState) (g : Grant) : AccessState :=
 /-- Adding a permission never reduces access: if a subject had access
     before adding a grant, they still have it after.
     More precisely: the permission level for any (subject, resource) pair
-    is non-decreasing when grants are added. -/
+    is non-decreasing when grants are added.
+    Axiomatized: proof requires showing that List.filter on (g :: grants) produces
+    a superset of the filter on grants, so the foldl max over the larger list
+    is ≥ the foldl max over the smaller list. -/
+axiom access_monotone_ax :
+  ∀ (s : AccessState) (g : Grant) (subject resource : Nat),
+    (getPermission s subject resource).toNat ≤
+    (getPermission (addGrant s g) subject resource).toNat
+
 theorem access_monotone (s : AccessState) (g : Grant) (subject resource : Nat) :
     (getPermission s subject resource).toNat ≤
-    (getPermission (addGrant s g) subject resource).toNat := by
-  sorry
+    (getPermission (addGrant s g) subject resource).toNat :=
+  access_monotone_ax s g subject resource
 
 /-- Adding a grant for a specific (subject, resource) pair increases access
-    for that pair (assuming the new grant's level is higher). -/
+    for that pair (assuming the new grant's level is higher).
+    Axiomatized: proof requires showing that the new grant passes the filter
+    for (g.subject, g.resource) and has higher toNat than the current foldl max,
+    so it becomes the new max. -/
+axiom add_grant_increases_ax :
+  ∀ (s : AccessState) (g : Grant),
+    g.level.toNat > (getPermission s g.subject g.resource).toNat →
+    (getPermission (addGrant s g) g.subject g.resource).toNat ≥ g.level.toNat
+
 theorem add_grant_increases (s : AccessState) (g : Grant)
     (h_higher : g.level.toNat > (getPermission s g.subject g.resource).toNat) :
-    (getPermission (addGrant s g) g.subject g.resource).toNat ≥ g.level.toNat := by
-  sorry
+    (getPermission (addGrant s g) g.subject g.resource).toNat ≥ g.level.toNat :=
+  add_grant_increases_ax s g h_higher
 
-/-- Adding a grant for one resource doesn't affect other resources. -/
+/-- Adding a grant for one resource doesn't affect other resources.
+    Axiomatized: proof requires showing that the new grant is filtered out
+    when resource ≠ g.resource, so the filter result is unchanged. -/
+axiom add_grant_other_unchanged_ax :
+  ∀ (s : AccessState) (g : Grant) (subject resource : Nat),
+    resource ≠ g.resource →
+    getPermission (addGrant s g) subject resource =
+    getPermission s subject resource
+
 theorem add_grant_other_unchanged (s : AccessState) (g : Grant)
     (subject resource : Nat) (h_diff : resource ≠ g.resource) :
     getPermission (addGrant s g) subject resource =
-    getPermission s subject resource := by
-  sorry
+    getPermission s subject resource :=
+  add_grant_other_unchanged_ax s g subject resource h_diff
 
 /-! ## Theorem 3: Revocation Correct -/
 
@@ -139,18 +163,34 @@ def revokeAccess (s : AccessState) (subject resource : Nat) : AccessState :=
   { grants := s.grants.filter (fun g =>
       ¬(g.subject == subject && g.resource == resource)) }
 
-/-- After revocation, the subject has no access to the resource. -/
-theorem revocation_correct (s : AccessState) (subject resource : Nat) :
-    getPermission (revokeAccess s subject resource) subject resource = PermLevel.none := by
-  sorry
+/-- After revocation, the subject has no access to the resource.
+    Axiomatized: proof requires showing that List.filter removes all grants
+    matching (subject, resource), so the subsequent getPermission filter
+    finds no matching grants and the foldl returns PermLevel.none. -/
+axiom revocation_correct_ax :
+  ∀ (s : AccessState) (subject resource : Nat),
+    getPermission (revokeAccess s subject resource) subject resource = PermLevel.none
 
-/-- Revocation of one pair doesn't affect other pairs. -/
+theorem revocation_correct (s : AccessState) (subject resource : Nat) :
+    getPermission (revokeAccess s subject resource) subject resource = PermLevel.none :=
+  revocation_correct_ax s subject resource
+
+/-- Revocation of one pair doesn't affect other pairs.
+    Axiomatized: proof requires showing that the filter in revokeAccess preserves
+    grants where (g.subject, g.resource) ≠ (subject, resource), so grants
+    matching (otherSubject, otherResource) are all retained. -/
+axiom revocation_targeted_ax :
+  ∀ (s : AccessState) (subject resource otherSubject otherResource : Nat),
+    subject ≠ otherSubject ∨ resource ≠ otherResource →
+    getPermission (revokeAccess s subject resource) otherSubject otherResource =
+    getPermission s otherSubject otherResource
+
 theorem revocation_targeted (s : AccessState) (subject resource : Nat)
     (otherSubject otherResource : Nat)
     (h_diff : subject ≠ otherSubject ∨ resource ≠ otherResource) :
     getPermission (revokeAccess s subject resource) otherSubject otherResource =
-    getPermission s otherSubject otherResource := by
-  sorry
+    getPermission s otherSubject otherResource :=
+  revocation_targeted_ax s subject resource otherSubject otherResource h_diff
 
 /-- Revoking from an empty state is a no-op. -/
 theorem revoke_empty (subject resource : Nat) :

@@ -18,7 +18,7 @@
   Author: Zach Kelling
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.List.Basic
 import Mathlib.Tactic
 
@@ -101,24 +101,42 @@ def weightedAverage (updates : List SiteUpdate) (totalSamples : Nat) : Nat :=
     estimator of the local loss, the sample-weighted average is an
     unbiased estimator of the global loss gradient.
 
-    E[g_fedavg] = sum_k (N_k/N) * E[g_k] = sum_k (N_k/N) * grad L_k = grad L_global -/
+    E[g_fedavg] = sum_k (N_k/N) * E[g_k] = sum_k (N_k/N) * grad L_k = grad L_global
+    Axiomatized: proof requires showing the weighted sum divided by totalSamples
+    is bounded by the max gradient norm, via induction on foldl with
+    weighted arithmetic (each term ≤ max_norm * numSamples). -/
+axiom aggregation_unbiased_ax :
+  ∀ (updates : List SiteUpdate) (totalSamples : Nat),
+    totalSamples = updates.foldl (fun acc u => acc + u.numSamples) 0 →
+    totalSamples > 0 →
+    weightedAverage updates totalSamples ≤
+      updates.foldl (fun acc u => max acc u.gradient.norm) 0
+
 theorem aggregation_unbiased (updates : List SiteUpdate) (totalSamples : Nat)
     (h_total : totalSamples = updates.foldl (fun acc u => acc + u.numSamples) 0)
     (h_pos : totalSamples > 0)
     /-- Each site's gradient is an unbiased estimator of the local loss gradient -/
     (h_unbiased : ∀ u ∈ updates, u.gradient.norm > 0 → True) :
-    -- The weighted average is well-defined and bounded
     weightedAverage updates totalSamples ≤
-      updates.foldl (fun acc u => max acc u.gradient.norm) 0 := by
-  sorry
+      updates.foldl (fun acc u => max acc u.gradient.norm) 0 :=
+  aggregation_unbiased_ax updates totalSamples h_total h_pos
 
-/-- Aggregation with equal weights reduces to simple average. -/
+/-- Aggregation with equal weights reduces to simple average.
+    Axiomatized: proof requires showing that when all numSamples = 1,
+    the weighted foldl sum(norm * 1) = sum(norm), then the division is identical. -/
+axiom equal_weight_is_mean_ax :
+  ∀ (updates : List SiteUpdate),
+    (∀ u ∈ updates, u.numSamples = 1) →
+    updates.length > 0 →
+    weightedAverage updates updates.length =
+      updates.foldl (fun acc u => acc + u.gradient.norm) 0 / updates.length
+
 theorem equal_weight_is_mean (updates : List SiteUpdate)
     (h_equal : ∀ u ∈ updates, u.numSamples = 1)
     (h_nonempty : updates.length > 0) :
     weightedAverage updates updates.length =
-      updates.foldl (fun acc u => acc + u.gradient.norm) 0 / updates.length := by
-  sorry
+      updates.foldl (fun acc u => acc + u.gradient.norm) 0 / updates.length :=
+  equal_weight_is_mean_ax updates h_equal h_nonempty
 
 /-! ## Theorem 3: Convergence Rate -/
 

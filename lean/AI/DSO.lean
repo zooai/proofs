@@ -18,7 +18,7 @@
   - Composable: priors from N agents aggregate safely
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.List.Basic
 import Mathlib.Tactic
 
