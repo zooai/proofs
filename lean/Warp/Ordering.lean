@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Warp Cross-Chain Causal Ordering
 
   If message A causally precedes message B on the source chain,

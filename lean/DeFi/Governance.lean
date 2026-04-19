@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   On-Chain DEX Governance
 
   DAO governance for DEX parameters: fee tiers, pool weights,

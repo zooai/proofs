@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   High-Frequency Trading Venue Model
 
   Kansas City venue, launched December 25, 2025.

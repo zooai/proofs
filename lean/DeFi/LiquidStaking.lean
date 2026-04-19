@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Liquid Staking and Yield Protocol
 
   Staked assets earn yield while remaining liquid.

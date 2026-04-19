@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Peer Discovery and Network Topology
 
   How validators find each other. Bootstrap nodes, gossip protocol,

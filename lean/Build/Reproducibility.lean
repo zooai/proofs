@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Build Reproducibility Theorem
 
   A build is reproducible iff it avoids non-deterministic coeffects.

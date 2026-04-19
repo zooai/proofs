@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   TFHE (Torus Fully Homomorphic Encryption) Correctness
 
   Fast Boolean operations on encrypted data. The core of Lux's

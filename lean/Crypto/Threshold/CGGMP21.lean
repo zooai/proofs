@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   CGGMP21 MPC Protocol Correctness
 
   The UC-secure threshold ECDSA protocol used for MPC wallets.

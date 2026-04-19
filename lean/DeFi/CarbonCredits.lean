@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Carbon Credit Conservation — Token Integrity
 
   Formal proofs about carbon credit tokens used in conservation finance.

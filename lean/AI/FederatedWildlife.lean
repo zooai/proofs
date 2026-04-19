@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Federated Learning for Wildlife Monitoring — Convergence Properties
 
   Formal verification of ZooFed's federated learning framework for

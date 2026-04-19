@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Remote Sensing Data Integrity
 
   Formal proofs about integrity of satellite and sensor imagery

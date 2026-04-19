@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   DAO Governance Properties
 
   Proposals require quorum to pass. Voting power comes from

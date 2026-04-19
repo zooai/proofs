@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Multi-Agent Emergence (Delta Soup)
 
   Emergent behavior in multi-agent "soup" environments where agents

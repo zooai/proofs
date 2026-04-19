@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Treasury Management Properties
 
   The DAO treasury holds funds and distributes them via governance.

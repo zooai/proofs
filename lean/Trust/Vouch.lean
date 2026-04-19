@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Vouch-Based Trust Model
 
   No CA. No global root. Trust flows through attestation chains.

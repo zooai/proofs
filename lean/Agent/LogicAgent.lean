@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Logic-Based Agent Proofs
 
   Formal logic foundations for agentic reasoning. Covers BDI

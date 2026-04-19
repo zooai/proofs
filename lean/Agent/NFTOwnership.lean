@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   NFT-Bound Agent Ownership and Delegation
 
   Formal proofs about the Agent NFT Standard's ownership model.

@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   DeFi Order Book Correctness
 
   Permissionless on-chain order matching for the Lux DEX.

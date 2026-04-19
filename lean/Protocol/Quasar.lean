@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Quasar Protocol Formal Model
 
   Models protocol/quasar/ -- BLS+Ringtail hybrid quantum consensus.

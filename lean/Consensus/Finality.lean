@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   End-to-End Finality Composition
 
   Ties together BFT + Safety + Liveness + Quasar into a single

@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Cross-Ecosystem Build Verification
 
   Proves that verified builds compose across Hanzo, Lux, and Zoo.

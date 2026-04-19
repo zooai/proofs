@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Flash Loan Safety
 
   Atomic borrow-use-repay within a single transaction.

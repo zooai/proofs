@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   ERC20 Token Invariants
 
   Transfer preserves total supply. Balance cannot go negative.

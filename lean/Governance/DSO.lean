@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Decentralized Science Organization (DSO) Governance
 
   Formal proofs about voting safety in Zoo's decentralized governance

@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Threshold Protocol Composition
 
   Proves that the threshold protocols compose safely:

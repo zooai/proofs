@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Liquid Staking Invariants
 
   Staking locks tokens and mints liquid staking derivatives (LSDs).

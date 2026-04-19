@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   SBOM+ Contribution Graph
 
   Extends standard SBOM with role-aware attribution.

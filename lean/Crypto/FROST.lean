@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   FROST Threshold Signature Correctness
 
   Models the FROST precompile (src/precompiles/frost/).

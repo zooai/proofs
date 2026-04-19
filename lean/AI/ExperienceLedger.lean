@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Experience Ledger
 
   Content-addressed, append-only log of semantic experiences.

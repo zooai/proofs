@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Ringtail Threshold Lattice Signature Correctness
 
   Models the Ringtail precompile (src/precompiles/ringtail-threshold/).

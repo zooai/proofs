@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Post-Quantum Key Exchange Handshake
 
   Hybrid key exchange: X25519 + ML-KEM-768.

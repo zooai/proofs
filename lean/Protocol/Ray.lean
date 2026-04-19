@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Ray Protocol Formal Model
 
   Models protocol/ray/ray.go -- linear chain consensus driver.

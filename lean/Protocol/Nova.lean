@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Nova Protocol Formal Model
 
   Models protocol/nova/nova.go -- linear blockchain consensus mode.

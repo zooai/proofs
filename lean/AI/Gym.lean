@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Zoo Gym Training Platform Correctness
 
   Training-free GRPO (Group Relative Policy Optimization)

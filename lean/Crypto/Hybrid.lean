@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Post-Quantum Hybrid Signature Correctness
 
   Models the hybrid signature scheme combining:

@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   ML-DSA (FIPS 204) Signature Correctness
 
   Models the ML-DSA precompile (src/precompiles/mldsa/).

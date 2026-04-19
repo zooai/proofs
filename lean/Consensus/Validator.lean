@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Validator Economics and Slashing
 
   Staking economics for Lux validators. Stake-weighted voting.
