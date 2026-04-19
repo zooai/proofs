@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Reward Shaping Proofs
 
   Formal verification of reward shaping techniques for reinforcement

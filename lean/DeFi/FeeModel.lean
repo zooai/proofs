@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   DeFi Fee Model
 
   Maker-taker with volume tiers. Permissionless.

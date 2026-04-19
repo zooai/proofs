@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Photon Protocol Formal Model
 
   Models protocol/photon/ -- committee selection.

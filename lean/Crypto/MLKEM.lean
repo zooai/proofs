@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   ML-KEM (FIPS 203) Key Encapsulation Correctness
 
   Post-quantum key encapsulation mechanism. Used for key exchange

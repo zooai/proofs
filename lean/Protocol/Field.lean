@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Field Protocol Formal Model
 
   Models protocol/field/field.go -- DAG consensus driver.

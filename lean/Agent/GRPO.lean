@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Training-Free Group Relative Policy Optimization (TF-GRPO) Convergence
 
   Formal verification of convergence properties for the HLLM framework's

@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Consensus Liveness Proof
 
   Theorem: Under partial synchrony with f < n/3 Byzantine nodes,
@@ -63,6 +65,8 @@ axiom honest_sample_dominance :
       honestPreferring (trace (r + 1)) v > p.alpha
 
 /-
+  Authors: Antje Worring, Zach Kelling
+
   If honest nodes have a common preference after GST,
   they accumulate confidence monotonically.
 -/

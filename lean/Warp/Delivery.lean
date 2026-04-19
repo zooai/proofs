@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Warp Cross-Chain Exactly-Once Delivery
 
   Models the Warp messaging protocol used for cross-chain communication.

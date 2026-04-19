@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Wave Protocol Formal Model
 
   Models protocol/wave/wave.go and protocol/wave/fpc/fpc.go.

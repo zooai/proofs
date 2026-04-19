@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Authority Meet-Semilattice
 
   Models authority as a set of capabilities with meet (intersection).

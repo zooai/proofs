@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Linear Secret Sharing (LSS) Correctness
 
   Foundation for threshold cryptography. Generalizes Shamir's

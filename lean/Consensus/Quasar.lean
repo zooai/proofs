@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Quasar Consensus Integration
 
   Quasar is the post-quantum consensus engine combining:

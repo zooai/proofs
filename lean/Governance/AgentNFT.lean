@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Agent NFT Properties
 
   NFTs that represent AI agent identities.

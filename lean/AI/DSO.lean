@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Decentralized Semantic Optimization (DSO)
 
   Training-free model adaptation via shared semantic experiences.

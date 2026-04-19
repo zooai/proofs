@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Conservation Impact Bonds — Financial Properties
 
   Formal proofs about conservation impact bonds (CIBs) where

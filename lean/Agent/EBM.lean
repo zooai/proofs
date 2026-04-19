@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Energy-Based Model Agent Proofs
 
   Formal verification of energy-based models for agent decision-making.

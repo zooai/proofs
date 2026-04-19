@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Verkle Tree Correctness
 
   Verkle trees = Vector commitment + Merkle tree.

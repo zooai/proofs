@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Cross-Chain Compute Verification
 
   Proves that AI compute can be safely distributed across N chains

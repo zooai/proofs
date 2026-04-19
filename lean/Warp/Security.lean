@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Warp Message Security
 
   Warp is the cross-subnet messaging protocol. Messages are

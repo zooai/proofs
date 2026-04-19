@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Nebula Protocol Formal Model
 
   Models protocol/nebula/nebula.go -- DAG consensus mode.

@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   CKKS (Approximate Arithmetic) FHE Correctness
 
   Homomorphic computation on approximate real numbers.

@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Embedding Correctness (7680-dimensional)
 
   Vector embeddings for semantic search and RAG.

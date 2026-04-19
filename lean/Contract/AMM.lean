@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Automated Market Maker (HMM) Invariants
 
   Hanzo Market Maker: constant-product AMM for AI compute resources.

@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   BLS Signature Aggregation Correctness
 
   Models the BLS signature scheme used in Quasar (quasar/bls.go).

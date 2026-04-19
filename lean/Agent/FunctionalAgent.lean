@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Functional/Compositional Agent Proofs
 
   Compositional agent architectures using functional programming

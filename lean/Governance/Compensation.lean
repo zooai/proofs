@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Compensation Fairness Properties
 
   Compensation flows from the DAO treasury to contributors

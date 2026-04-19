@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Per-User AI Personalization (HIP-0006/HIP-0022)
 
   Own Your AI: personalized model adaptation via experience curation.

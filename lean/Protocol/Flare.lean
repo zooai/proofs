@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Flare Protocol Formal Model
 
   Models protocol/flare/flare.go and core/dag/flare.go.

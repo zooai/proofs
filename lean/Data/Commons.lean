@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Data Commons Access Control
 
   Formal proofs about the Zoo Data Commons access control model.

@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Coeffect Algebra
 
   Effects: what a computation DOES to the world.

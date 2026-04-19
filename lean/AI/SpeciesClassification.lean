@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Species Classification Model Accuracy Bounds
 
   Formal proofs about PAC learning bounds, certified robustness,

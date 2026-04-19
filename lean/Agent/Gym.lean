@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Agent Training Environment (Gym) Safety Properties
 
   Formal proofs about the Gym training platform's environment safety.

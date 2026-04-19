@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Experience Token Conservation Laws
 
   Formal proofs about the Zoo Experience Ledger's token model.

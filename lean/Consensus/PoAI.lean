@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Proof of AI (PoAI) Consensus Mechanism
 
   Formal verification of the PoAI consensus protocol which secures blockchain

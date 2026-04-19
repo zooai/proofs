@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Consensus Safety Proof
 
   Theorem: No two honest nodes finalize conflicting values at the same height.
@@ -85,6 +87,8 @@ noncomputable def honestCount (s : ConsensusState p) : Nat :=
     Finset.univ)
 
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Key invariant: once a node finalizes, its preference never changes.
   This models the early-return in wave.go:98-102:
     if state.Decided { return }
@@ -94,6 +98,8 @@ axiom finalized_preference_stable :
     hasFinalized s i v → s'.round > s.round → hasFinalized s' i v
 
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Key invariant: finalization requires beta consecutive rounds with
   alpha-threshold majority. If alpha > 2k/3 and honest majority holds,
   then at most one value can achieve alpha threshold in any round.
@@ -113,6 +119,8 @@ axiom unique_threshold :
     v1 = v2
 
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Finalization window overlap: if two nodes finalize in the same epoch,
   their beta-length confirmation windows must share at least one round.
   This is the pigeonhole argument that connects finalization to unique_threshold.
@@ -128,6 +136,8 @@ axiom finalization_windows_overlap :
       honestCount s_overlap = honestCount s
 
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Main Safety Theorem
 
   If two honest nodes finalize values at the same height,

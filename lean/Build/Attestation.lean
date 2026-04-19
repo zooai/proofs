@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Content-Addressed Build Attestation
 
   Every build artifact is content-addressed via uor.foundation URIs.

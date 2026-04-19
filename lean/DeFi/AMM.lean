@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Automated Market Maker (AMM) Invariants
 
   Constant-product AMM for Lux DeFi.

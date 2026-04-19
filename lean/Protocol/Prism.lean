@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Prism Protocol Formal Model
 
   Models protocol/prism/ -- peer sampling via Fisher-Yates shuffle.

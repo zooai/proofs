@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Revocation Model
 
   Revocations cancel vouches. A revocation must be cryptographically

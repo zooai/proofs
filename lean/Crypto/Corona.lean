@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Corona Threshold Lattice Signature Correctness
 
   Models the Corona precompile (src/precompiles/corona-threshold/).

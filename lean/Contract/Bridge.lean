@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Bridge Token Safety
 
   MPC-controlled bridge tokens (ZETH, ZBTC, ZUSD).

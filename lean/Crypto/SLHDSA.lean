@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   SLH-DSA (FIPS 205) Hash-Based Signature Correctness
 
   The conservative backup in the hybrid scheme. SLH-DSA's security

@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Byzantine Fault Tolerance Threshold Proof
 
   Theorem: Safety and liveness hold when f < n/3 nodes are Byzantine.

@@ -1,4 +1,6 @@
 /-
+  Authors: Antje Worring, Zach Kelling
+
   Teleport Bridge Protocol
 
   Lock-and-mint bridge for $AI token across all supported chains.
