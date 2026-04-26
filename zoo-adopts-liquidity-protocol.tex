@@ -1,0 +1,341 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+
+\hypersetup{colorlinks=true,linkcolor=black,citecolor=blue,urlcolor=blue}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}{Definition}
+\newtheorem{remark}{Remark}
+\newtheorem{proposition}[theorem]{Proposition}
+
+\title{Zoo Adopts the Liquidity Protocol\\
+{\large Composition of Zoo NFT-LP (2021), Per-LLM Chains, and DAO
+with Liquidity.io's Liquidity Protocol (2026)}}
+\author{Zoo Labs Foundation\\
+\texttt{research@zoo.ngo}}
+\date{Adoption: 2026-04-20}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+On 2026-04-20 Zoo Labs Foundation formally adopts the Liquidity
+Protocol (Liquidity.io, 2026-04-01) as the canonical regulated
+securities-collateralised settlement layer for treasury and
+contributor compensation, while explicitly retaining the
+2021 Zoo trade-name ``NFT Liquidity Protocol'' for
+NFT-collateralised lending. We prove formal differentiation
+(disjoint asset classes) and composition (both stacks compose under
+Quasar 3.0 finality without interference). The result is that Zoo
+operates two distinct ``liquidity protocols'' on the same chain
+with no semantic collision and no cross-contamination of state.
+\end{abstract}
+
+\tableofcontents
+
+%% ==================================================================
+\section{Two protocols, one trade name}
+\label{sec:two}
+%% ==================================================================
+
+\begin{table}[h]
+\centering
+\caption{Trade-name disambiguation}
+\begin{tabular}{lll}
+\toprule
+& Zoo NFT-LP (2021) & Liquidity.io LP (2026) \\
+\midrule
+Asset class      & ERC-721 / ZRC-721         & ERC-3643 \\
+Quote token      & ERC-20 stable             & USDL (1:1 USD) \\
+Counterparty     & Zoo Lender Pool           & Alpaca Securities \\
+Coined           & October 2021              & April 2026 \\
+Citation         & \cite{zoo-2021}           & \cite{liquidity-lp} \\
+Soundness proof  & \cite{zoo-nft-lp}         & \cite{liquidity-lp} \S5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{remark}[Naming policy]
+In Zoo prose: ``NFT Liquidity Protocol'' or ``Zoo NFT-LP'' for the
+2021 trade name; ``Liquidity Protocol'' or ``Liquidity.io's LP'' for
+the 2026 protocol. We never abbreviate either as just ``LP'' without
+qualification.
+\end{remark}
+
+%% ==================================================================
+\section{Adoption boundary}
+\label{sec:adopt}
+%% ==================================================================
+
+\begin{definition}[Zoo adoption boundary]
+\label{def:adopt}
+``Zoo adopts the Liquidity Protocol'' means:
+\begin{enumerate}[nosep]
+  \item Zoo treasury disbursements (NGO payouts, DAO compensation)
+        settle via the Liquidity Protocol's OMA on Lux C-Chain (or
+        Zoo D-Chain when LP-134's D-Chain lands).
+  \item Per-LLM-chain contributor compensation, when paid in
+        securities-equivalent dollars, settles via the Liquidity
+        Protocol.
+  \item The 2021 Zoo NFT-LP continues to operate independently on
+        Zoo L1 with its own state space and ABI; Zoo carries forward
+        the 2021 trade-name claim under
+        Proposition~\ref{prop:disjoint}.
+\end{enumerate}
+This is forward-only.  Pre-2026-04-20 NFT-LP operations are not
+re-routed; Zoo treasury continues to support direct stablecoin
+disbursement as a fallback.
+\end{definition}
+
+%% ==================================================================
+\section{Disjointness}
+\label{sec:disjoint}
+%% ==================================================================
+
+\begin{proposition}[Disjoint state spaces]
+\label{prop:disjoint}
+The state spaces are disjoint at every level:
+\[
+  \mathcal{S}_{\mathrm{Zoo\text{-}NFT\text{-}LP}} \cap
+  \mathcal{S}_{\mathrm{Liquidity\text{-}LP}} = \emptyset.
+\]
+\begin{enumerate}[nosep]
+  \item ABI selectors differ;
+  \item contract addresses differ (different deployer accounts,
+        different bytecode);
+  \item asset classes differ
+        (Prop.~\ref{prop:nft-vs-sec}).
+\end{enumerate}
+\end{proposition}
+
+\begin{proposition}[NFT vs.\ security tokens]
+\label{prop:nft-vs-sec}
+ERC-721 (NFT) and ERC-3643 (security) are distinct EVM token
+standards with distinct interfaces. No token is simultaneously
+both. Even if a single token contract implemented both interfaces
+(``hybrid token''), the dispatch is via function selector, so the
+LP that handles it is determined by which interface is invoked.
+\end{proposition}
+
+\begin{proof}
+Both follow from inspection of the standards. ERC-721 has unique
+\texttt{tokenId}-keyed storage; ERC-3643 has compliance-gated
+transfer. A single contract implementing both would route requests
+through the appropriate selector; the runtime never confuses a
+\texttt{transferFrom(uint256)} call (ERC-721) with a
+\texttt{transfer(address,uint256)} call (ERC-3643).
+\end{proof}
+
+%% ==================================================================
+\section{Composition theorem}
+\label{sec:compose}
+%% ==================================================================
+
+\begin{theorem}[Zoo composition under Quasar finality]
+\label{thm:compose}
+Let $b$ be a Lux execution-chain block containing transactions
+$T_b$ that interleave Zoo NFT-LP, Liquidity Protocol, Zoo per-LLM
+chain commitments, and DAO governance ciphertexts. Under
+\cite[Theorem 7.5]{quasar-cert} (QuasarCert soundness),
+\cite[Theorem 5.2]{liquidity-lp} (LP atomicity), and
+\cite[Theorem 4.1]{zoo-nft-lp} (NFT-LP soundness), the post-block
+state $s_b'$ is:
+\begin{enumerate}[nosep]
+  \item deterministic given $s_{b-1}$ and $T_b$;
+  \item satisfies all per-protocol invariants
+        (NFT-LP atomic lending, LP atomic swap, DAO weighted-vote
+        correctness);
+  \item finalised under Quasar 3.0 PQ finality.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+By Prop.~\ref{prop:disjoint} the state updates of distinct
+protocols are non-overlapping. Block-STM serialisability
+(\cite{dagevm-lean}) ensures determinism. Each protocol's atomicity
+property is preserved within a single transaction (per-protocol
+proofs cited above). QuasarCert finalises the unique post-state by
+\cite[Theorem 7.5]{quasar-cert}.
+\end{proof}
+
+\begin{corollary}[No cross-contamination]
+\label{cor:no-cross}
+A bug or exploit in Liquidity.io's LP cannot affect Zoo NFT-LP
+state; a bug in Zoo NFT-LP cannot affect Liquidity.io LP state.
+The two are isolated by Prop.~\ref{prop:disjoint}.
+\end{corollary}
+
+%% ==================================================================
+\section{Detailed proof of Theorem \ref{thm:compose}}
+\label{sec:proof-detail}
+%% ==================================================================
+
+We give a more careful argument.
+
+\paragraph{Setup.}
+Block $b$ contains a sequence of transactions
+$T_b = (\mathsf{tx}_1, \ldots, \mathsf{tx}_N)$, each labelled with
+its target protocol (NFT-LP, LP, per-LLM-chain, DAO, or
+unaffiliated EVM). The block is built by some honest proposer; the
+post-state is computed by Block-STM scheduling.
+
+\paragraph{Step 1: per-protocol disjointness.}
+By Prop.~\ref{prop:disjoint}, the read/write sets of distinct
+protocols do not intersect at the storage-key level (different
+contract addresses imply different storage prefixes). Block-STM's
+optimistic scheduler thus never re-executes a transaction due to
+cross-protocol conflict.
+
+\paragraph{Step 2: per-protocol atomicity.}
+Each transaction is single-EVM-tx atomic: failures inside the call
+graph revert the whole transaction. Hence within each protocol,
+the per-protocol invariants (NFT-LP atomic lending,
+LP atomic swap, DAO single-step proposal closure, per-LLM-chain
+single-step gradient apply) hold.
+
+\paragraph{Step 3: serialisability.}
+Block-STM produces a serial schedule $\pi$ (\cite{dagevm-lean}).
+Running $\pi$ on $s_{b-1}$ yields $s_b'$. By determinism of EVM
+and pinned FP modes (per-LLM-chain only), $s_b'$ is unique.
+
+\paragraph{Step 4: finality.}
+QuasarCert $\mathcal{C}_b$ binds to
+$\mathsf{subj}_b$ which commits to the post-state root $s_b'$. By
+\cite[Theorem 7.5]{quasar-cert} the cert is sound: an adversary
+cannot finalise a different post-state.
+
+\paragraph{Result.}
+$s_b'$ is deterministic, satisfies all per-protocol invariants,
+and is PQ-finalised. \qed
+
+%% ==================================================================
+\section{Worked example: NGO disbursement}
+\label{sec:example}
+%% ==================================================================
+
+A passing DAO proposal disburses 10{,}000 USDL to WWF.  The flow:
+
+\begin{enumerate}[nosep]
+  \item DAO contract emits intent
+        $(t = \mathrm{now}, P = \mathrm{proposal}\#42,
+          \mathrm{NGO}=\text{WWF}, \mathrm{amount}=10{,}000)$
+        after Theorem~5.1 of \cite{zoo-dao} (tally correctness)
+        accepts.
+  \item Treasury bot constructs OMA call:
+        $\texttt{OMA.swap(USDL, USDL, 10000, recipient=WWF\_addr)}$
+        on Lux C-Chain.
+  \item The OMA, observing same-token swap, treats this as a
+        direct transfer; ATS inventory check passes; transfer
+        executes.
+  \item Block finalises under Quasar 3.0; WWF wallet receives
+        $10{,}000$ USDL minted from ATS-backed reserves.
+\end{enumerate}
+
+By Theorem~\ref{thm:compose} this commits atomically with the DAO
+state (proposal marked disbursed) and is PQ-final.
+
+%% ==================================================================
+\section{Worked example: NFT-LP and Liquidity-LP coexistence}
+\label{sec:coexist}
+%% ==================================================================
+
+A Lux C-Chain block $b$ contains:
+\begin{itemize}[nosep]
+  \item Tx 1: NFT-LP loan issuance --- borrower deposits a Zoo
+        animal NFT, receives $1{,}000$ ZUSD;
+  \item Tx 2: NFT-LP marketplace trade --- buyer purchases an NFT
+        for $500$ ZUSD; $12.50$ goes to sustainability treasury
+        per Lemma~\ref{lem:tax} of \cite{zoo-nft-lp};
+  \item Tx 3: Liquidity-Protocol OMA swap --- user converts
+        $50$ USDL to $0.21$ AAPL (via ATS inventory).
+\end{itemize}
+
+After Block-STM execution, all three transactions commit. By
+Proposition~\ref{prop:disjoint}, no cross-contamination is possible:
+the NFT-LP state map and Liquidity-LP state map have disjoint keys
+(ABI selectors and contract addresses differ). By
+Theorem~\ref{thm:compose}, the post-state is unique and
+PQ-finalised.
+
+%% ==================================================================
+\section{Operational notes}
+\label{sec:ops}
+%% ==================================================================
+
+\paragraph{Treasury bot.}
+The Zoo treasury bot is a permissionless on-chain script. It
+reads DAO outcomes and emits OMA settlement transactions; it holds
+no privileged keys (the DAO multisig is the only authority).
+
+\paragraph{Naming in code.}
+Solidity / Move / Vyper code in the Zoo repos uses \texttt{NFTLP}
+(no spaces) for the 2021 trade name and
+\texttt{LiquidityProtocol} (camel-case) for the 2026 Liquidity.io
+adoption. The two are referenced via separate import paths to
+prevent any namespace collision.
+
+\paragraph{Brand mapping.}
+Both protocols operate within the Zoo brand surface; the Zoo
+documentation site distinguishes them by visual styling
+(NFT-LP: animal-themed; LP: Liquidity.io blue). No protocol-level
+ambiguity arises.
+
+%% ==================================================================
+\section{Status, 2026-04-20}
+\label{sec:status}
+%% ==================================================================
+
+\begin{itemize}[nosep]
+  \item Zoo L1: live (with Zoo D-/E-/F-Chain white-label resells of
+        Lux templates).
+  \item Zoo NFT-LP: live (V4 rebuild, Lux C-Chain).
+  \item Zoo per-LLM chains: live (Block-STM-as-consensus on Lux).
+  \item Zoo DAO: live (homomorphic tally, M-Chain MPC threshold
+        decrypter).
+  \item Liquidity.io LP: live since 2026-04-01.
+  \item Cross-link: Zoo treasury disbursement contract upgraded
+        2026-04-20 to support OMA settlement (default-on for new
+        proposals).
+\end{itemize}
+
+%% ==================================================================
+\begin{thebibliography}{9}
+
+\bibitem{zoo-2021}
+A.~Worring, Z.~Kelling.
+\newblock Zoo: NFT-Driven Conservation, October 2021.
+\newblock \texttt{zooai/papers/zoo-2021-original-whitepaper/}.
+
+\bibitem{liquidity-lp}
+Liquidity.io.
+\newblock The Liquidity Protocol v1.0.
+\newblock \texttt{liquidityio/proofs/liquidity-protocol/}, April 2026.
+
+\bibitem{zoo-nft-lp}
+Zoo Labs Foundation.
+\newblock Zoo NFT Liquidity Protocol: Soundness.
+\newblock \texttt{zooai/proofs/zoo-nft-liquidity-protocol-soundness.tex}, 2026.
+
+\bibitem{quasar-cert}
+Z.~Kelling.
+\newblock QuasarCert Soundness, Quasar 3.0.
+\newblock \texttt{luxfi/proofs/quasar-cert-soundness.tex}, 2025-12-15.
+
+\bibitem{dagevm-lean}
+Lux Industries.
+\newblock \texttt{lean/Consensus/DAGEVM.lean}.
+
+\bibitem{lux-adopts}
+Lux Industries.
+\newblock Lux Adopts the Liquidity Protocol.
+\newblock \texttt{luxfi/proofs/lux-adopts-liquidity-protocol.tex}, 2026-04-20.
+
+\end{thebibliography}
+
+\end{document}
