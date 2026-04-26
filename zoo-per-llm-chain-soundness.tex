@@ -1,0 +1,355 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+
+\hypersetup{colorlinks=true,linkcolor=black,citecolor=blue,urlcolor=blue}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}{Definition}
+\newtheorem{remark}{Remark}
+\newtheorem{proposition}[theorem]{Proposition}
+
+\title{Zoo Per-LLM Chain Soundness\\
+{\large Deterministic Gradient Ordering, Attribution-Graph
+Correctness, and Byte-Identical Reproducibility}}
+\author{Zoo Labs Foundation\\
+\texttt{research@zoo.ngo}}
+\date{Spec: 2026-04-15 \\ Effective: 2026-04-20}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The Zoo per-LLM training chain records every gradient update applied
+to a model into a Quasar-finalised chain. We prove three results:
+(i)~deterministic gradient ordering via Block-STM-as-consensus;
+(ii)~correctness of the on-chain attribution graph that maps
+training contributions to contributors; (iii)~a reproducibility
+theorem stating that any party with the same training data, the same
+random seed, and the same chain head produces a byte-identical model
+artifact. Inheritance from \cite{quasar-cert} provides PQ finality.
+\end{abstract}
+
+\tableofcontents
+
+%% ==================================================================
+\section{Background}
+\label{sec:bg}
+%% ==================================================================
+
+Zoo's per-LLM training chain is a distinct chain per model. Each
+block in the chain records:
+\begin{itemize}[nosep]
+  \item a training step index $t$;
+  \item a batch hash $\mathsf{b}_t$ (Merkle root over input batch);
+  \item a gradient delta hash $\mathsf{g}_t$;
+  \item a contributor identity $\mathsf{c}_t$ (DID);
+  \item a model state root $\mathsf{m}_t$ post-update.
+\end{itemize}
+
+The chain is implemented on Lux's Block-STM-as-consensus
+infrastructure (\cite{dagevm-lean}) with the additional constraint
+that gradient updates are commutative within a single block --- as in
+synchronous SGD --- but causally ordered across blocks.
+
+%% ==================================================================
+\section{Deterministic gradient ordering}
+\label{sec:order}
+%% ==================================================================
+
+\begin{definition}[Gradient batch]
+\label{def:batch}
+A \emph{gradient batch} for step $t$ is the multiset
+$G_t = \{ g_t^{(c)} \mid c \in \mathcal{C}_t \}$ where
+$\mathcal{C}_t$ is the set of contributors who submitted a gradient
+for step $t$.
+\end{definition}
+
+\begin{definition}[Aggregation rule]
+\label{def:agg}
+The aggregation function is the average:
+$\bar{g}_t = \frac{1}{|\mathcal{C}_t|} \sum_{c \in \mathcal{C}_t} g_t^{(c)}$.
+\end{definition}
+
+\begin{lemma}[Order independence within a batch]
+\label{lem:order-indep}
+Floating-point summation is non-associative, but with a fixed
+deterministic order (lexicographic on contributor DID), the result
+is unique. The Zoo chain enforces this order at the block-encoding
+level.
+\end{lemma}
+
+\begin{proof}
+The block encoding sorts contributors by DID byte order before
+aggregation. With fixed order, IEEE 754 produces a deterministic
+result.
+\end{proof}
+
+\begin{theorem}[Deterministic ordering]
+\label{thm:det-order}
+Let $b$ be a per-LLM chain block finalised by a QuasarCert. The
+post-block model state root $\mathsf{m}_b$ is a deterministic
+function of the pre-state $\mathsf{m}_{b-1}$ and the gradient batch
+$G_b$.
+\end{theorem}
+
+\begin{proof}
+By Lemma~\ref{lem:order-indep}, aggregation is deterministic.
+Block-STM serialisability~\cite{dagevm-lean} ensures one global
+ordering of blocks. The model update
+$\theta_{b} = \theta_{b-1} - \eta \cdot \bar{g}_b$ is a deterministic
+function of $\theta_{b-1}$ and $\bar{g}_b$.
+\end{proof}
+
+%% ==================================================================
+\section{Attribution graph}
+\label{sec:attr}
+%% ==================================================================
+
+\begin{definition}[Attribution graph]
+\label{def:attr}
+The \emph{attribution graph} of a per-LLM chain is the directed
+acyclic graph $\mathcal{G}_M = (V, E)$ where:
+\begin{itemize}[nosep]
+  \item $V$ = contributors recorded in any block of the chain;
+  \item $(c, c') \in E$ iff $c$ contributed at step $t$ and $c'$
+        contributed at step $t' > t$ on the same model lineage.
+\end{itemize}
+Edges are weighted by the marginal loss reduction attributable to
+$c$'s contribution at step $t$.
+\end{definition}
+
+\begin{theorem}[Attribution-graph integrity]
+\label{thm:attr-integ}
+If the per-LLM chain is finalised under QuasarCert, then the
+attribution graph $\mathcal{G}_M$ derivable from the chain is
+unique and tamper-evident: any change to any
+$(\mathsf{b}_t, \mathsf{g}_t, \mathsf{c}_t)$ tuple invalidates the
+state root $\mathsf{m}_t$ and hence the QuasarCert at block $t$.
+\end{theorem}
+
+\begin{proof}
+The block encoding stores
+$(\mathsf{b}_t, \mathsf{g}_t, \mathsf{c}_t)$ as part of the block's
+Merkle leaf. Modifying any field changes the block hash and
+therefore $\mathsf{subj}_b$. By Theorem~7.5 of
+\cite{quasar-cert}, forging a new QuasarCert on a modified subject
+is bounded by $\mathsf{negl}(\lambda)$.
+\end{proof}
+
+\begin{corollary}[Contributor compensation correctness]
+\label{cor:comp}
+A contributor's compensation share, computed as the path-sum
+weight in $\mathcal{G}_M$, is a deterministic function of the
+chain. If compensation is paid via the Liquidity Protocol
+(2026-04-20 adoption, see \cite{zoo-adopts}), the payment leg is
+atomic with the attribution record.
+\end{corollary}
+
+%% ==================================================================
+\section{Byte-identical reproducibility}
+\label{sec:repro}
+%% ==================================================================
+
+\begin{definition}[Reproducibility predicate]
+\label{def:repro}
+Given a per-LLM chain head $b^\star$ and a public initial state
+$\mathsf{m}_0$, the chain is \emph{byte-identically reproducible}
+iff: any party that:
+\begin{enumerate}[nosep]
+  \item starts from $\mathsf{m}_0$;
+  \item replays each block $b = 1, \ldots, b^\star$ in chain order;
+  \item applies the canonical aggregation
+        (Lemma~\ref{lem:order-indep});
+\end{enumerate}
+produces the same byte-string final model
+$\theta_{b^\star}$ as the original training run.
+\end{definition}
+
+\begin{theorem}[Reproducibility]
+\label{thm:repro}
+The Zoo per-LLM chain is byte-identically reproducible.
+\end{theorem}
+
+\begin{proof}
+By Theorem~\ref{thm:det-order} the per-block update is deterministic
+given the pre-state and the gradient batch. By
+Theorem~\ref{thm:attr-integ} the gradient batches are
+tamper-evidently recorded. By induction on block number, the final
+state $\theta_{b^\star}$ depends only on $\mathsf{m}_0$ and the
+recorded batches. Floating-point determinism is enforced by
+canonical contributor ordering (Lemma~\ref{lem:order-indep}); the
+training framework binds to a single FP implementation
+(IEEE 754 binary32 / binary16) and a deterministic CUDA / ROCm
+kernel set declared at chain genesis. Hence anyone can rebuild the
+final model byte-for-byte.
+\end{proof}
+
+\begin{remark}[FP determinism caveat]
+GPU non-determinism is real. Zoo per-LLM chains use the
+NVIDIA / AMD ``deterministic ops'' subset and pin all kernel
+versions in the chain genesis. Under these constraints the
+proof goes through. If a GPU vendor introduces a non-deterministic
+kernel, the chain genesis must be updated (a fork).
+\end{remark}
+
+%% ==================================================================
+\section{Detailed proof: deterministic ordering}
+\label{sec:detail-order}
+%% ==================================================================
+
+We expand Theorem~\ref{thm:det-order}.
+
+\paragraph{Setup.}
+At step $t$, the model state is $\theta_{t-1}$ (a vector of
+floating-point weights) and the gradient batch is $G_t$ (a multiset
+of contributor gradient vectors). We assume:
+\begin{itemize}[nosep]
+  \item gradient vectors have a fixed dimension $d$ (the model's
+        parameter count);
+  \item every $g^{(c)}$ is encoded as IEEE 754 binary32 (or
+        binary16) in row-major order;
+  \item the chain genesis pins the GPU/CPU kernel manifest
+        $\mathrm{KernelManifest}$.
+\end{itemize}
+
+\paragraph{Ordering subroutine.}
+The block builder sorts contributors lexicographically by DID byte
+order; let $c_{(1)}, \ldots, c_{(k)}$ be the sorted list. The
+aggregate is computed as a left-fold:
+$\bar{g}_t = \frac{1}{k} \cdot
+  ((((g^{(c_{(1)})} + g^{(c_{(2)})}) + g^{(c_{(3)})}) +
+    \cdots) + g^{(c_{(k)})}).$
+This left-fold order is unique given the sorted input.
+
+\paragraph{Determinism of left-fold.}
+IEEE 754 addition is non-associative, but for fixed left-fold order
+the result is unique. The kernel manifest pins the FP rounding
+mode (round-to-nearest-even) and the CUDA / ROCm fused-multiply-add
+flag (off by default in deterministic mode).
+
+\paragraph{Update step.}
+$\theta_t = \theta_{t-1} - \eta \cdot \bar{g}_t$ where $\eta$ is the
+learning-rate schedule (also pinned in the chain genesis as a
+deterministic function of $t$).
+
+\paragraph{Result.}
+$\theta_t$ is a pure function of $(\theta_{t-1}, G_t,
+\mathrm{KernelManifest}, \eta(t))$, all of which are recorded on
+chain. Hence the post-block model state is deterministic, as
+claimed in Theorem~\ref{thm:det-order}.
+
+%% ==================================================================
+\section{Per-block storage layout}
+\label{sec:layout}
+%% ==================================================================
+
+\begin{table}[h]
+\centering
+\caption{Per-LLM chain block field layout.}
+\begin{tabular}{lll}
+\toprule
+Field & Type & Size \\
+\midrule
+\texttt{chain\_id} (model registry id)   & \texttt{uint64}        & 8 B  \\
+\texttt{step\_index} $t$                 & \texttt{uint64}        & 8 B  \\
+\texttt{batch\_root} $\mathsf{b}_t$       & \texttt{bytes32}       & 32 B \\
+\texttt{gradient\_root} $\mathsf{g}_t$    & \texttt{bytes32}       & 32 B \\
+\texttt{contributors} (sorted DID list)  & \texttt{bytes[]}       & variable \\
+\texttt{model\_root} $\mathsf{m}_t$       & \texttt{bytes32}       & 32 B \\
+\texttt{quasar\_cert} $\mathcal{C}_t$     & cert tuple             & $\approx 8$ KB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The contributor list is the canonical lexicographic-DID-byte order
+(Lemma~\ref{lem:order-indep}); any non-canonical ordering
+invalidates the deterministic-aggregation premise.
+
+%% ==================================================================
+\section{Reproducibility test plan}
+\label{sec:test}
+%% ==================================================================
+
+For any per-LLM chain $\mathcal{M}$ a third party can:
+
+\begin{enumerate}[nosep]
+  \item snapshot the chain head $b^\star$;
+  \item read the genesis $(\mathsf{m}_0,
+        \mathrm{KernelManifest})$ from block 0;
+  \item replay each block's gradient batch in order, using only
+        the data accessible from the chain (batch hashes index
+        into IPFS; gradient hashes index into the contributor's
+        commitment);
+  \item compute $\theta_{b^\star}$;
+  \item verify $H(\theta_{b^\star}) = \mathsf{m}_{b^\star}$.
+\end{enumerate}
+
+Theorem~\ref{thm:repro} states that this test always succeeds,
+modulo the FP-determinism caveat (kernel pinning).  In practice,
+Zoo uses NVIDIA cuBLAS deterministic mode and AMD rocBLAS
+deterministic kernel set as declared in
+$\mathrm{KernelManifest}$.
+
+%% ==================================================================
+\section{Cross-references with Zoo ZIPs}
+\label{sec:zip}
+%% ==================================================================
+
+\begin{itemize}[nosep]
+  \item ZIP-0400 -- AI Assistant: defines the inference / training
+        contract surface.
+  \item ZIP-0401 -- Per-LLM chains: introduces this construction.
+  \item ZIP-0405 -- Reproducible training: pins the deterministic
+        kernel manifest format.
+  \item ZIP-0418 -- Contributor compensation: defines the
+        attribution-graph weight formula and the on-chain payout.
+\end{itemize}
+
+%% ==================================================================
+\section{Composition with Liquidity Protocol}
+\label{sec:lp-compose}
+%% ==================================================================
+
+Contributor compensation, when paid on-chain, is settled via the
+Liquidity Protocol post 2026-04-20 (see \cite{zoo-adopts}).
+Composition follows from the same argument as
+\cite{lux-adopts} \S4: trade atomicity composes with Block-STM
+serialisability; the per-LLM chain is itself a Block-STM-as-consensus
+chain.
+
+%% ==================================================================
+\begin{thebibliography}{9}
+
+\bibitem{quasar-cert}
+Z.~Kelling.
+\newblock QuasarCert Soundness, Quasar 3.0.
+\newblock \texttt{luxfi/proofs/quasar-cert-soundness.tex}, 2025-12-15.
+
+\bibitem{dagevm-lean}
+Lux Industries.
+\newblock \texttt{lean/Consensus/DAGEVM.lean}.
+
+\bibitem{zoo-adopts}
+Zoo Labs Foundation.
+\newblock Zoo Adopts the Liquidity Protocol.
+\newblock \texttt{zooai/proofs/zoo-adopts-liquidity-protocol.tex}, 2026-04-20.
+
+\bibitem{lux-adopts}
+Lux Industries.
+\newblock Lux Adopts the Liquidity Protocol.
+\newblock \texttt{luxfi/proofs/lux-adopts-liquidity-protocol.tex}, 2026-04-20.
+
+\bibitem{zoo-2021}
+A.~Worring, Z.~Kelling.
+\newblock Zoo: NFT-Driven Conservation, October 2021.
+\newblock \texttt{zooai/papers/zoo-2021-original-whitepaper/}.
+
+\end{thebibliography}
+
+\end{document}

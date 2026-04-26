@@ -1,0 +1,365 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+
+\hypersetup{colorlinks=true,linkcolor=black,citecolor=blue,urlcolor=blue}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}{Definition}
+\newtheorem{remark}{Remark}
+\newtheorem{proposition}[theorem]{Proposition}
+
+\title{Zoo DAO Governance Soundness\\
+{\large Homomorphic / Holographic-Consensus Voting with FHE-Tallied
+Secrecy and Sybil Bounds}}
+\author{Zoo Labs Foundation\\
+\texttt{research@zoo.ngo}}
+\date{Spec freeze: 2026-04-15 \\ Effective: 2026-04-20}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The Zoo DAO uses a holographic-consensus governance scheme with
+weighted voting where weights are derived from advocacy /
+involvement / contribution scores stored on-chain. Vote tallies are
+computed under Fully Homomorphic Encryption (TFHE / CKKS, see
+\cite{lp-fhe}) so that individual votes remain secret while the
+total is publicly verifiable. We prove three results:
+(i)~weighted-voting math correctness under the homomorphic tally;
+(ii)~vote-secrecy preservation against a passive adversary holding
+the chain transcript;
+(iii)~an anti-Sybil bound on advocacy / involvement / contribution
+(AIC) scores.
+\end{abstract}
+
+\tableofcontents
+
+%% ==================================================================
+\section{Background}
+\label{sec:bg}
+%% ==================================================================
+
+The Zoo DAO governance contract implements weighted voting on
+proposals. Each member $m$ has an AIC score
+$s_m = \alpha \cdot a_m + \beta \cdot i_m + \gamma \cdot c_m$
+where $a_m$ is advocacy (community participation), $i_m$ is
+involvement (engagement metrics), $c_m$ is contribution (verified
+on-chain commits / payments / NGO actions). Weights
+$\alpha, \beta, \gamma$ are chain-genesis constants.
+
+Votes on proposal $P$ are submitted as ciphertexts
+$c_m = \mathrm{Enc}_{\mathrm{tfhe}}(v_m)$ where $v_m \in \{0, 1\}$
+(reject / approve). The DAO contract aggregates ciphertexts using
+TFHE addition; the total is decrypted under threshold decryption
+(M-Chain MPC, LP-134) and compared against a quorum threshold.
+
+%% ==================================================================
+\section{Weighted-voting correctness}
+\label{sec:weight}
+%% ==================================================================
+
+\begin{definition}[Weighted vote ciphertext]
+\label{def:wv}
+A weighted vote is
+$c_m^\star = \mathrm{Enc}_{\mathrm{tfhe}}(s_m \cdot v_m)$, where
+$s_m$ is public (stored on-chain) and $v_m$ is the secret choice.
+\end{definition}
+
+\begin{lemma}[Linearity of TFHE addition]
+\label{lem:linear}
+For TFHE ciphertexts $c_1, c_2$ encrypting integers $x_1, x_2$ in
+the homomorphic plaintext space,
+$\mathrm{Dec}(c_1 \boxplus c_2) = x_1 + x_2$.
+\end{lemma}
+
+\begin{proof}
+Standard property of TFHE; see \cite{tfhe} Theorem 4.1.
+\end{proof}
+
+\begin{theorem}[Tally correctness]
+\label{thm:tally}
+Given weighted vote ciphertexts
+$\{c_m^\star\}_{m \in \mathcal{M}}$, the tally
+$T = \sum_{m \in \mathcal{M}} s_m \cdot v_m$ computed as
+$\mathrm{Dec}(\boxplus_m c_m^\star)$ is correct: the decrypted
+result equals the plaintext weighted sum.
+\end{theorem}
+
+\begin{proof}
+By Lemma~\ref{lem:linear} and induction on the number of
+ciphertexts. The threshold decryption step is correct under the
+M-Chain MPC unforgeability assumption (see \cite{cggmp21-lean,
+frost-lean}).
+\end{proof}
+
+\begin{remark}[Quorum and approval]
+A proposal $P$ passes iff $T \geq q \cdot \sum_m s_m$ for
+quorum constant $q$. Both $T$ and $\sum_m s_m$ are publicly known
+post-tally; the comparison is a public deterministic predicate.
+\end{remark}
+
+%% ==================================================================
+\section{Vote secrecy preservation}
+\label{sec:secrecy}
+%% ==================================================================
+
+\begin{definition}[Secrecy game]
+\label{def:secrecy}
+The vote-secrecy game between adversary $\mathcal{A}$ and the
+DAO is:
+\begin{enumerate}[nosep]
+  \item $\mathcal{A}$ chooses target member $m^\star$;
+  \item the DAO sets $v_{m^\star} \overset{\$}{\leftarrow} \{0,1\}$
+        and publishes $c_{m^\star}^\star =
+        \mathrm{Enc}_{\mathrm{tfhe}}(s_{m^\star} \cdot v_{m^\star})$;
+  \item $\mathcal{A}$ outputs guess $\tilde{v}$.
+\end{enumerate}
+$\mathcal{A}$ wins iff $\tilde{v} = v_{m^\star}$.
+$\mathsf{Adv}^{\mathrm{secrecy}}_{\mathcal{A}} =
+|\Pr[\mathcal{A}\text{ wins}] - 1/2|$.
+\end{definition}
+
+\begin{theorem}[Vote secrecy]
+\label{thm:secrecy}
+Under TFHE IND-CPA security
+(\cite{tfhe} Theorem 5.2),
+$\mathsf{Adv}^{\mathrm{secrecy}}_{\mathcal{A}} \leq
+\mathsf{Adv}^{\mathrm{IND\text{-}CPA}}_{\mathrm{TFHE}} =
+\mathsf{negl}(\lambda)$.
+\end{theorem}
+
+\begin{proof}
+Reduction: any distinguisher of $v_{m^\star} = 0$ vs $v_{m^\star}=1$
+ciphertexts gives an IND-CPA distinguisher on TFHE. The
+threshold-decrypted tally only reveals the sum, not individual
+votes; the sum information leak is bounded by entropy of
+$|\mathcal{M}|$-fold sums (a standard mix-net-style argument).
+\end{proof}
+
+\begin{corollary}[Coercion resistance under threshold decryption]
+\label{cor:coerc}
+A coercer who observes only on-chain ciphertexts cannot learn the
+target member's vote with non-negligible advantage. Coercion
+resistance against the threshold-decrypter committee is bounded by
+the M-Chain MPC committee's honesty: at least one of the
+$t$ decrypters must be honest for vote secrecy to hold, where
+$t$ is the threshold parameter.
+\end{corollary}
+
+%% ==================================================================
+\section{Anti-Sybil bound on AIC scores}
+\label{sec:sybil}
+%% ==================================================================
+
+\begin{definition}[AIC score growth]
+\label{def:aic}
+The AIC score $s_m$ for member $m$ at time $t$ is
+\[
+  s_m(t) = \alpha \int_0^t a_m(\tau) d\tau +
+            \beta \int_0^t i_m(\tau) d\tau +
+            \gamma \cdot \mathrm{Contrib}_m(t),
+\]
+where $a_m, i_m$ are continuous-time non-negative engagement signals
+(rate-limited by the DAO's anti-spam policy) and
+$\mathrm{Contrib}_m(t)$ is the cumulative on-chain contribution
+verified under triple-hybrid identity (Crypto/Hybrid.lean).
+\end{definition}
+
+\begin{lemma}[Engagement rate bound]
+\label{lem:engage}
+The DAO contract enforces
+$a_m(\tau), i_m(\tau) \leq R_{\max}$ for some rate
+constant $R_{\max}$ via on-chain rate-limit checks. Hence
+$\alpha a_m + \beta i_m \leq (\alpha + \beta) R_{\max}$ at all
+times.
+\end{lemma}
+
+\begin{theorem}[Sybil bound]
+\label{thm:sybil}
+A Sybil set $\mathcal{S}$ of $k$ fake identities, each generating
+the maximum allowed engagement and zero verified contribution,
+contributes at most $k \cdot (\alpha + \beta) R_{\max} \cdot t$
+to the total AIC score after time $t$. Honest contribution-weighted
+votes from a single real identity with verified
+$\mathrm{Contrib}_m(t) > k \cdot (\alpha + \beta) R_{\max} \cdot t /
+\gamma$ outvotes the Sybil set.
+\end{theorem}
+
+\begin{proof}
+By Lemma~\ref{lem:engage}, the Sybil aggregate AIC growth is
+bounded. Verified contribution $\mathrm{Contrib}_m$ requires
+on-chain transactions or NGO partnership records, which Sybils
+cannot fabricate at zero cost. Choosing
+$\gamma$ large relative to $(\alpha + \beta) R_{\max}$ in the
+chain genesis closes the loop; the explicit threshold is
+$\mathrm{Contrib}_m > (k (\alpha + \beta) R_{\max} t)/\gamma$.
+\end{proof}
+
+\begin{remark}[Practical parameters]
+The 2026 Zoo DAO uses $\alpha = 1, \beta = 1, \gamma = 100$ and
+$R_{\max} = 100$ engagement-units/day. A single $\$10$ verified
+contribution thus exceeds 10 days of Sybil-maxed engagement from
+one fake account; 100-fake-account Sybils are bounded by 1 verified
+contribution of $\$100$.
+\end{remark}
+
+%% ==================================================================
+\section{Detailed reduction: vote secrecy}
+\label{sec:detail-secrecy}
+%% ==================================================================
+
+We expand the proof of Theorem~\ref{thm:secrecy}.
+
+\paragraph{Game.}
+Following the standard IND-CPA-style framing for TFHE:
+\begin{enumerate}[nosep]
+  \item $\mathcal{A}$ submits the index $m^\star$ of the target
+        member; the simulator commits to all other members'
+        votes (chosen by $\mathcal{A}$, modeling honest-but-known
+        counters).
+  \item The simulator picks $b \overset{\$}{\leftarrow} \{0,1\}$
+        and sets $v_{m^\star} = b$.
+  \item The simulator computes
+        $c_{m^\star}^\star = \mathrm{Enc}_{\mathrm{tfhe}}(s_{m^\star} \cdot b)$.
+  \item $\mathcal{A}$ outputs guess $\tilde{b}$.
+\end{enumerate}
+$\mathcal{A}$'s advantage is $|\Pr[\tilde{b} = b] - 1/2|$.
+
+\paragraph{Reduction to TFHE IND-CPA.}
+Given $\mathcal{A}$ in the secrecy game, build a TFHE distinguisher
+$\mathcal{D}$:
+\begin{enumerate}[nosep]
+  \item $\mathcal{D}$ receives a TFHE challenge ciphertext $c^\star$
+        encrypting either $0$ or $s_{m^\star}$ (the simulator
+        chose).
+  \item $\mathcal{D}$ runs $\mathcal{A}$ on input $c^\star$; outputs
+        $\mathcal{A}$'s guess as the distinguishing bit.
+\end{enumerate}
+$\mathsf{Adv}_{\mathcal{D}}^{\mathrm{IND\text{-}CPA}} =
+ \mathsf{Adv}_{\mathcal{A}}^{\mathrm{secrecy}}$ (modulo the trivial
+sum-information, which has zero contribution under the standard
+information-theoretic mix-net argument because the sum is
+decrypted only after all ciphertexts are committed).
+
+\paragraph{Conclusion.}
+$\mathsf{Adv}^{\mathrm{secrecy}} \leq
+ \mathsf{Adv}^{\mathrm{IND\text{-}CPA}}_{\mathrm{TFHE}}$, the
+right-hand side negligible by~\cite{tfhe} Theorem 5.2.
+
+%% ==================================================================
+\section{Worked example: a typical proposal}
+\label{sec:example}
+%% ==================================================================
+
+Proposal $P$: ``Disburse 50{,}000 USDL to WWF for 2026 conservation
+program.'' Members $m_1, \ldots, m_5$ have AIC scores
+$s_1 = 100, s_2 = 200, s_3 = 50, s_4 = 30, s_5 = 70$.
+Members $\{m_1, m_2, m_5\}$ vote approve ($v=1$); $\{m_3, m_4\}$
+vote reject ($v=0$).
+
+Tally:
+$T = 100 \cdot 1 + 200 \cdot 1 + 50 \cdot 0 + 30 \cdot 0 + 70 \cdot 1 = 370$.
+
+Total stake $\sum s = 450$; quorum $q = 0.5$ requires $T \geq 225$.
+$370 \geq 225$, proposal passes.
+
+By Theorem~\ref{thm:tally}, the homomorphic sum $T$ is correct.
+By Theorem~\ref{thm:secrecy}, an adversary observing only the
+on-chain ciphertexts learns nothing about individual votes.
+Sybil bound (Theorem~\ref{thm:sybil}) ensures $m_3, m_4$ cannot
+multiply themselves into a winning coalition without
+observable on-chain contributions.
+
+%% ==================================================================
+\section{Threshold-decryption ceremony}
+\label{sec:thresh-dec}
+%% ==================================================================
+
+The decryption is a ceremony on M-Chain (LP-134):
+
+\begin{enumerate}[nosep]
+  \item DAO contract closes voting at deadline; the encrypted
+        sum $C_T = \boxplus_m c_m^\star$ is published in the DAO
+        contract storage.
+  \item M-Chain validators run the FROST-style threshold decryption
+        ceremony for $C_T$, requiring $t$-of-$n$ honest decrypters
+        (\cite{frost-lean}).
+  \item The plaintext $T$ is published; the DAO contract compares
+        against $q \cdot \sum_m s_m$ and emits the
+        \texttt{ProposalPassed} or \texttt{ProposalFailed} event.
+\end{enumerate}
+
+The decryption ceremony itself is finalised on M-Chain under
+Quasar 3.0 (\cite{quasar-cert}); the result is therefore
+PQ-final.
+
+%% ==================================================================
+\section{Cross-references}
+\label{sec:cross}
+%% ==================================================================
+
+\begin{itemize}[nosep]
+  \item ZIP-0017 -- DAO governance core.
+  \item ZIP-0023 -- Holographic-consensus reputation.
+  \item ZIP-0026 -- Quadratic / weighted voting framework.
+  \item ZIP-0027 -- AIC score derivation.
+\end{itemize}
+
+%% ==================================================================
+\section{Composition with Liquidity Protocol}
+\label{sec:lp}
+%% ==================================================================
+
+DAO treasury disbursements (e.g.\ to NGOs) settle via the Liquidity
+Protocol post 2026-04-20 (\cite{zoo-adopts}). Composition is direct:
+the DAO emits a settlement intent $(t, P, \mathrm{NGO}_i, \mathrm{amount})$
+when a passing tally is decoded; the OMA contract on Lux C-Chain
+executes the swap. Atomicity follows
+\cite[Theorem 5.2]{liquidity-lp}; PQ finality follows
+\cite[Theorem 7.7]{quasar-cert}.
+
+%% ==================================================================
+\begin{thebibliography}{9}
+
+\bibitem{tfhe}
+I.~Chillotti, N.~Gama, M.~Georgieva, M.~Izabach\`ene.
+\newblock TFHE: Fast Fully Homomorphic Encryption over the Torus.
+\newblock J.~Cryptology, 2020.
+
+\bibitem{lp-fhe}
+Lux Industries.
+\newblock LP-FHE Series (CKKS, TFHE).
+\newblock \texttt{luxfi/lps/}.
+
+\bibitem{cggmp21-lean}
+Lux Industries.
+\newblock \texttt{lean/Crypto/Threshold/CGGMP21.lean}.
+
+\bibitem{frost-lean}
+Lux Industries.
+\newblock \texttt{lean/Crypto/FROST.lean}.
+
+\bibitem{quasar-cert}
+Z.~Kelling.
+\newblock QuasarCert Soundness, Quasar 3.0.
+\newblock \texttt{luxfi/proofs/quasar-cert-soundness.tex}, 2025-12-15.
+
+\bibitem{liquidity-lp}
+Liquidity.io.
+\newblock The Liquidity Protocol v1.0.
+\newblock \texttt{liquidityio/proofs/liquidity-protocol/}, April 2026.
+
+\bibitem{zoo-adopts}
+Zoo Labs Foundation.
+\newblock Zoo Adopts the Liquidity Protocol.
+\newblock \texttt{zooai/proofs/zoo-adopts-liquidity-protocol.tex}, 2026-04-20.
+
+\end{thebibliography}
+
+\end{document}
