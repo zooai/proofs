@@ -312,16 +312,16 @@ PQ-final.
 \end{itemize}
 
 %% ==================================================================
-\section{Composition with Liquidity Protocol}
+\section{Composition with downstream tokenization partners}
 \label{sec:lp}
 %% ==================================================================
 
-DAO treasury disbursements (e.g.\ to NGOs) settle via the Liquidity
-Protocol post 2026-04-20 (\cite{zoo-adopts}). Composition is direct:
-the DAO emits a settlement intent $(t, P, \mathrm{NGO}_i, \mathrm{amount})$
-when a passing tally is decoded; the OMA contract on Lux C-Chain
-executes the swap. Atomicity follows
-\cite[Theorem 5.2]{liquidity-lp}; PQ finality follows
+DAO treasury disbursements (e.g.\ to NGOs) settle via a regulated
+tokenization partner deployment on the Lux ecosystem. Composition is
+direct: the DAO emits a settlement intent
+$(t, P, \mathrm{NGO}_i, \mathrm{amount})$ when a passing tally is decoded;
+the OMA contract on Lux C-Chain executes the swap. Atomicity follows
+from the partner's settlement-atomicity theorem; PQ finality follows
 \cite[Theorem 7.7]{quasar-cert}.
 
 %% ==================================================================
@@ -349,16 +349,6 @@ Lux Industries.
 Z.~Kelling.
 \newblock QuasarCert Soundness, Quasar 3.0.
 \newblock \texttt{luxfi/proofs/quasar-cert-soundness.tex}, 2025-12-15.
-
-\bibitem{liquidity-lp}
-Liquidity.io.
-\newblock The Liquidity Protocol v1.0.
-\newblock \texttt{liquidityio/proofs/liquidity-protocol/}, April 2026.
-
-\bibitem{zoo-adopts}
-Zoo Labs Foundation.
-\newblock Zoo Adopts the Liquidity Protocol.
-\newblock \texttt{zooai/proofs/zoo-adopts-liquidity-protocol.tex}, 2026-04-20.
 
 \end{thebibliography}
 
