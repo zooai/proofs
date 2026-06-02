@@ -87,7 +87,8 @@ theorem tensor_pure_pure (a b : Coeffects)
 theorem tensor_reproducible (a b : Coeffects)
     (ha : a.isReproducible) (hb : b.isReproducible) :
     (a ++ b).isReproducible := by
-  simp [Coeffects.isReproducible, List.all_append, Bool.and_eq_true]
+  simp only [Coeffects.isReproducible, List.all_append, Bool.and_eq_true]
+  simp only [Coeffects.isReproducible] at ha hb
   exact ⟨ha, hb⟩
 
 /-- Time is not reproducible -/

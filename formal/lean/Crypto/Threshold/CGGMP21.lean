@@ -51,41 +51,43 @@ inductive Phase where
 axiom keygen_correctness :
   ∀ (p : Params) (honest : Nat),
     honest ≥ p.t →
-    ∃ (pk : Nat) (shares : List KeyShare),
+    ∃ (_pk : Nat) (shares : List KeyShare),
       shares.length = p.n ∧
       -- All honest parties agree on the same public key
       True
 
 /-- Signing correctness: t parties with presignatures produce valid ECDSA sig -/
 axiom sign_correctness :
-  ∀ (p : Params) (shares : List KeyShare) (msg : Nat),
+  ∀ (p : Params) (shares : List KeyShare) (_msg : Nat),
     shares.length ≥ p.t →
-    ∃ (r s : Nat), True  -- (r, s) is a valid ECDSA signature
+    ∃ (_r _s : Nat), True  -- (r, s) is a valid ECDSA signature
 
 /-- Identifiable abort: if signing fails, we know who cheated -/
 axiom identifiable_abort :
-  ∀ (p : Params) (shares : List KeyShare) (msg : Nat),
+  ∀ (p : Params) (shares : List KeyShare) (_msg : Nat),
     -- If protocol doesn't produce a valid signature,
     -- the zero-knowledge proofs identify the malicious party
     shares.length ≥ p.t →
-    (∃ (sig : Nat), True) ∨ (∃ (cheater : Nat), cheater < p.n)
+    (∃ (_sig : Nat), True) ∨ (∃ (cheater : Nat), cheater < p.n)
 
 /-- Threshold: t-1 parties learn nothing about the key -/
 theorem insufficient_parties_no_key (p : Params) (compromised : Nat)
     (h : compromised < p.t) :
-    compromised + 1 ≤ p.n := by omega
+    compromised + 1 ≤ p.n := by
+  have := p.ht
+  omega
 
 /-- Online signing is constant-round (1 round with presignatures) -/
 theorem online_constant_round : (1 : Nat) = 1 := rfl
 
 /-- Refresh preserves the public key -/
 axiom refresh_preserves_pk :
-  ∀ (p : Params) (old_shares new_shares : List KeyShare),
+  ∀ (_p : Params) (old_shares new_shares : List KeyShare),
     new_shares.length = old_shares.length
 
 /-- Refresh invalidates old shares -/
 axiom refresh_invalidates_old :
-  ∀ (p : Params) (old_shares new_shares : List KeyShare) (msg : Nat),
+  ∀ (_p : Params) (_old_shares _new_shares : List KeyShare) (_msg : Nat),
     -- Old shares alone cannot produce signatures after refresh
     True
 
@@ -107,7 +109,7 @@ def presigUsed (presigs : List Presignature) (idx : Nat) : Bool :=
 
 /-- OFFLINE/ONLINE SEPARATION: Presig generation is independent
     of the message. Generate presigs in bulk, sign instantly online. -/
-theorem offline_online_independent (p : Params) :
+theorem offline_online_independent (_p : Params) :
     -- Presignature generation doesn't need the message
     -- Online signing is 1 round with presig
     (1 : Nat) + 0 = 1 := rfl
@@ -123,18 +125,20 @@ theorem key_never_reconstructed (p : Params) (shares : List KeyShare)
 /-- ROBUSTNESS: With n parties and up to n-t failures, still have t honest -/
 theorem cggmp_robustness (p : Params) (failures : Nat)
     (h : failures ≤ p.n - p.t) :
-    p.n - failures ≥ p.t := by omega
+    p.n - failures ≥ p.t := by
+  have := p.ht
+  omega
 
 /-- PAILLIER ZK: Each round includes Paillier-based ZK proofs.
     These ensure honest behavior without revealing shares. -/
 axiom paillier_zk_sound :
-  ∀ (p : Params) (share : KeyShare),
+  ∀ (_p : Params) (_share : KeyShare),
     -- ZK proof verifies iff the share is correctly formed
     -- (Paillier encryption enables range proofs on shares)
     True
 
 /-- REFRESH PRESERVES THRESHOLD: After refresh, same t is needed -/
-theorem refresh_preserves_threshold (p : Params) (old_shares new_shares : List KeyShare)
+theorem refresh_preserves_threshold (_p : Params) (old_shares new_shares : List KeyShare)
     (h : new_shares.length = old_shares.length) :
     new_shares.length = old_shares.length := h
 

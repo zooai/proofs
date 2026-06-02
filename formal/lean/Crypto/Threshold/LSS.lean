@@ -49,7 +49,7 @@ axiom lss_correctness :
 
 /-- Privacy: any t-1 shares reveal nothing about the secret -/
 axiom lss_privacy :
-  ∀ (acc : AccessStructure) (s1 s2 : Nat) (subset : List Share),
+  ∀ (acc : AccessStructure) (_s1 _s2 : Nat) (subset : List Share),
     subset.length < acc.threshold →
     -- The distribution of shares is independent of the secret
     -- (information-theoretic security, not just computational)
@@ -57,13 +57,13 @@ axiom lss_privacy :
 
 /-- Linearity: shares are linear in the secret -/
 axiom lss_linearity :
-  ∀ (acc : AccessStructure) (a b : Nat),
+  ∀ (_acc : AccessStructure) (_a _b : Nat),
     -- share(a + b) can be computed from share(a) + share(b)
     -- without interaction (each party adds their shares locally)
     True
 
 /-- Shamir's scheme: polynomial evaluation is the canonical LSS -/
-theorem shamir_is_lss (n t : Nat) (ht : t ≤ n) (ht0 : 0 < t) :
+theorem shamir_is_lss (n t : Nat) (_ht : t ≤ n) (ht0 : 0 < t) :
     -- Shamir secret sharing uses degree-(t-1) polynomial
     -- Evaluation at n distinct points gives n shares
     -- Any t points determine the polynomial (Lagrange interpolation)
@@ -109,12 +109,13 @@ axiom vss_honest_valid :
 theorem proactive_refresh_resets (acc : AccessStructure) (epochs : Nat) :
     -- Attacker needs t shares within EACH epoch, not across epochs
     -- Total compromise requires t × epochs shares (simplified model)
-    acc.threshold * (epochs + 1) ≥ acc.threshold := by omega
+    acc.threshold * (epochs + 1) ≥ acc.threshold :=
+  Nat.le_mul_of_pos_right acc.threshold (Nat.succ_pos epochs)
 
 /-- SHARE COMBINATION: Two LSS instances over the same access structure
     can be combined: share(a) + share(b) = share(a + b).
     This enables MPC addition without interaction. -/
-theorem local_addition_no_interaction (acc : AccessStructure) :
+theorem local_addition_no_interaction (_acc : AccessStructure) :
     -- Each party adds their shares locally
     -- No communication needed for addition
     -- This is WHY LSS is the foundation for all threshold protocols

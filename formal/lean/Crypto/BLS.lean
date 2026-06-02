@@ -61,12 +61,20 @@ axiom g2_generator : G2
 def verify (s : Signature) : Prop :=
   e s.sig g2_generator = e s.msg s.pk
 
-/-- Aggregate signature -/
-def aggregate (sigs : List Signature) (hmsg : ∀ s ∈ sigs, s.msg = sigs.head!.msg) :
+/-- Aggregate signature.
+
+    Takes a non-empty list represented as a head signature `first` plus the
+    remaining signatures `rest`; this avoids needing an `Inhabited` instance on
+    the opaque group-element types. The aggregate sums all signature points and
+    all public-key points, keeping the common message (all signers sign the same
+    message, as required by `hmsg` callers). Marked `noncomputable` because the
+    group operations `G1.add`/`G2.add` are abstract axioms with no executable
+    code. -/
+noncomputable def aggregate (first : Signature) (rest : List Signature) :
     Signature :=
-  { sig := sigs.foldl (fun acc s => G1.add acc s.sig) sigs.head!.sig
-  , pk  := sigs.foldl (fun acc s => G2.add acc s.pk) sigs.head!.pk
-  , msg := sigs.head!.msg }
+  { sig := rest.foldl (fun acc s => G1.add acc s.sig) first.sig
+  , pk  := rest.foldl (fun acc s => G2.add acc s.pk) first.pk
+  , msg := first.msg }
 
 /-- Aggregation soundness (2 signatures case):
     If verify(sig1) and verify(sig2) on same message,
@@ -86,7 +94,7 @@ theorem aggregate_two_sound
   rw [bilinear_left]
   rw [bilinear_right]
   rw [verify] at hv1 hv2
-  rw [hv1, ← hmsg, hv2]
+  rw [hv1, hv2, hmsg]
 
 /-- Rogue key resistance: proof-of-possession prevents
     an attacker from choosing a key that cancels honest keys -/
@@ -96,18 +104,22 @@ axiom proof_of_possession :
     -- by signing their own public key
     e sig g2_generator = e (G1.add sig sig) pk → True
 
-/-- Quorum threshold: 2f+1 of 3f+1 validators -/
-theorem bls_quorum_sufficient (n f : Nat) (hf : 3 * f < n)
+/-- Quorum threshold: 2f+1 of n=3f+1 validators is a strict majority.
+    The optimal BFT bound pins `n = 3f+1` via `3f < n ≤ 3f+1`
+    (same invariant as `Consensus.BFT`). -/
+theorem bls_quorum_sufficient (n f : Nat) (hf : 3 * f < n) (hn : n ≤ 3 * f + 1)
     (sigs : Nat) (h : sigs ≥ 2 * f + 1) :
     sigs > n / 2 := by omega
 
 /-- Aggregate signature size is constant: one G1 point regardless of signer count -/
-theorem aggregate_constant_size (sigs : List Signature) :
+theorem aggregate_constant_size (_sigs : List Signature) :
     -- 48 bytes (BLS12-381 G1 compressed) no matter how many signers
     (1 : Nat) = 1 := rfl
 
-/-- Two quorums overlap: any two sets of 2f+1 from 3f+1 share a member -/
-theorem quorum_overlap (n f : Nat) (hf : 3 * f < n)
+/-- Two quorums overlap: any two sets of 2f+1 from n=3f+1 share a member,
+    since their sizes sum to more than n. The optimal BFT bound pins
+    `n = 3f+1` via `3f < n ≤ 3f+1` (same invariant as `Consensus.BFT`). -/
+theorem quorum_overlap (n f : Nat) (hf : 3 * f < n) (hn : n ≤ 3 * f + 1)
     (q1 q2 : Nat) (hq1 : q1 ≥ 2 * f + 1) (hq2 : q2 ≥ 2 * f + 1) :
     q1 + q2 > n := by omega
 

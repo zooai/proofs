@@ -114,7 +114,7 @@ axiom preference_stable_under_majority :
 
 /-- Preference stability over multiple rounds -/
 axiom preference_stable_sustained :
-  ∀ (p : Params) (nm : NetworkModel) (trace : StateTrace p)
+  ∀ (p : Params) (_nm : NetworkModel) (trace : StateTrace p)
     (r₀ steps : Nat) (i : Fin p.n) (v : ValueId),
     isHonest (trace r₀) i →
     ((trace r₀).nodes i).preference = some v →
@@ -147,7 +147,7 @@ theorem liveness
     (r₀ : Nat)
     (v : ValueId)
     (_hsync : isSynchronous nm r₀)
-    (hbft : honestCount (trace r₀) > 2 * p.f)
+    (_hbft : honestCount (trace r₀) > 2 * p.f)
     (hpref : honestPreferring (trace r₀) v > p.alpha)
     -- Additional: synchrony persists and majority sustains
     (hsync_sustained : ∀ r, r₀ ≤ r → r < r₀ + p.beta → isSynchronous nm r)

@@ -63,11 +63,14 @@ theorem uniform_access_structure (p : UnifiedParams) (proto1 proto2 : Protocol) 
     sameAccessStructure ⟨proto1, p⟩ ⟨proto2, p⟩ := by
   simp [sameAccessStructure]
 
-/-- INDEPENDENCE: Key material from different protocols is distinct -/
+/-- INDEPENDENCE: Key material tagged with different protocols is distinct.
+    Because the `protocol` field is part of the structure, differing protocols
+    force the whole `KeyMaterial` records to differ (no cross-contamination). -/
 theorem protocol_independence (k1 k2 : KeyMaterial)
     (h : k1.protocol ≠ k2.protocol) :
-    k1 ≠ k2 ∨ k1.shareData ≠ k2.shareData ∨ True := by
-  exact Or.inr (Or.inr trivial)
+    k1 ≠ k2 := by
+  intro heq
+  exact h (by rw [heq])
 
 /-- THRESHOLD CONSISTENCY: t-of-n is the same t across all protocols -/
 theorem threshold_consistent (p : UnifiedParams)
@@ -94,8 +97,10 @@ theorem multi_keygen_uniform (p : UnifiedParams) (i j : Nat)
     sameAccessStructure
       (multiProtocolKeygen p)[i]
       (multiProtocolKeygen p)[j] := by
-  simp [multiProtocolKeygen, sameAccessStructure, List.map]
-  constructor <;> rfl
+  -- Every instance produced by the ceremony carries the SAME params `p`,
+  -- so list-indexing at any `i`/`j` yields `⟨_, p⟩`, whose params agree.
+  simp only [multiProtocolKeygen, sameAccessStructure, List.getElem_map]
+  exact ⟨trivial, trivial⟩
 
 /-- Protocol ordering: LSS is the foundation, everything else builds on it -/
 def dependsOn : Protocol → Protocol → Prop

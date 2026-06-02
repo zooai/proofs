@@ -52,13 +52,16 @@ def acceptVersioned (s : VersionedState) (newVersion : Nat) : Option VersionedSt
   else none
 
 /-- Version monotonicity: accepted versions strictly increase -/
-theorem version_monotone (s : VersionedState) (v : Nat)
+theorem version_monotone (s s' : VersionedState) (v : Nat)
     (h : acceptVersioned s v = some s') :
     s'.version > s.version := by
-  simp [acceptVersioned] at h
+  unfold acceptVersioned at h
   split at h
-  · simp_all
-  · simp at h
+  · rename_i hv
+    rw [Option.some.injEq] at h
+    rw [← h]
+    exact hv
+  · exact absurd h (by simp)
 
 /-- Stale versions are rejected -/
 theorem stale_rejected (s : VersionedState) (v : Nat)
@@ -76,6 +79,6 @@ theorem precedes_trans (a b c : OrderedMessage)
 
 /-- Precedes is irreflexive -/
 theorem precedes_irrefl (a : OrderedMessage) : ¬precedes a a := by
-  simp [precedes]; omega
+  simp [precedes]
 
 end Warp.Ordering

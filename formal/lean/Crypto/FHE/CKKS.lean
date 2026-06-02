@@ -24,7 +24,7 @@ structure Params where
   polyDegree : Nat     -- N (ring dimension)
   scaleBits : Nat      -- precision bits
   levels : Nat         -- multiplicative depth
-  hN : 0 < polyDegree
+  hN : 2 ≤ polyDegree  -- N is a power of two ≥ 2 (so N/2 ≥ 1 slots)
   hL : 0 < levels
 
 /-- Encrypted vector (abstract) -/
@@ -84,7 +84,9 @@ theorem transformer_layer_depth :
 def slotsPerCiphertext (p : Params) : Nat := p.polyDegree / 2
 
 theorem slots_positive (p : Params) : slotsPerCiphertext p ≥ 1 := by
-  simp [slotsPerCiphertext]; omega
+  have := p.hN
+  simp only [slotsPerCiphertext]
+  omega
 
 /-- Rescaling: after multiplication, rescale to manage noise -/
 axiom ckks_rescale : Params → CKKSCiphertext → CKKSCiphertext
@@ -95,10 +97,10 @@ axiom rescale_decreases_level :
 
 /-- ML inference: matrix multiply is add + multiply chains.
     With N slots and L levels, can process N×N matrices at depth L. -/
-theorem matmul_depth (rows cols : Nat) :
+theorem matmul_depth (rows cols : Nat) (hc : 0 < cols) :
     -- Matrix multiply needs log2(cols) multiplications
-    -- (each multiplication consumes one level)
-    rows * cols ≥ rows := by omega
+    -- (each multiplication consumes one level); a matrix has ≥ 1 column
+    rows * cols ≥ rows := Nat.le_mul_of_pos_right rows hc
 
 /-- ROTATION: Rotate slots within a ciphertext (for matrix operations).
     Rotation is a key-switching operation — O(1) per rotation. -/

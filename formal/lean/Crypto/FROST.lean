@@ -38,9 +38,10 @@ structure SchnorrSig where
 /-- Verification (abstract Schnorr): s*G = R + H(R,pk,msg)*pk -/
 axiom schnorr_verify : SchnorrSig → Nat → Nat → Bool
 
-/-- Share: each participant holds a secret share -/
+/-- Share: each participant holds a secret share.
+    `index` is the participant's evaluation point (a plain participant index). -/
 structure Share where
-  index : Fin n
+  index : Nat
   value : Nat
 
 /-- FROST correctness: if t honest participants execute the protocol,
@@ -66,6 +67,7 @@ axiom frost_unforgeability :
 theorem threshold_exact (p : ThresholdParams)
     (signers : Nat) (h : signers ≥ p.t) :
     signers > 0 := by
+  have := p.ht0
   omega
 
 /-- t-of-n: t must be at most n -/
@@ -74,6 +76,7 @@ theorem threshold_bounded (p : ThresholdParams) : p.t ≤ p.n := p.ht
 /-- Security margin: compromising t-1 is safe -/
 theorem security_margin (p : ThresholdParams) (compromised : Nat)
     (h : compromised < p.t) : compromised + 1 ≤ p.n := by
+  have := p.ht
   omega
 
 /-- Robustness: if we have n participants and at most f < n-t+1 fail,
@@ -81,6 +84,7 @@ theorem security_margin (p : ThresholdParams) (compromised : Nat)
 theorem robustness (p : ThresholdParams) (failures : Nat)
     (h : failures ≤ p.n - p.t) :
     p.n - failures ≥ p.t := by
+  have := p.ht
   omega
 
 /-- Optimal threshold: t = ceil(n/2)+1 for majority threshold -/
@@ -93,7 +97,7 @@ theorem majority_threshold_safe (n : Nat) (hn : n > 0)
     This is a protocol property: the refreshed polynomial has the
     same constant term (same secret) but different shares. -/
 axiom share_refresh_correctness :
-  ∀ (p : ThresholdParams) (old_shares new_shares : List Share)
+  ∀ (p : ThresholdParams) (_old_shares new_shares : List Share)
     (aggPK msg : Nat),
     new_shares.length ≥ p.t →
     ∃ (sig : SchnorrSig), schnorr_verify sig aggPK msg = true
