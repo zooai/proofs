@@ -54,7 +54,7 @@ def acceptVersioned (s : VersionedState) (newVersion : Nat) : Option VersionedSt
   else none
 
 /-- Version monotonicity: accepted versions strictly increase -/
-theorem version_monotone (s : VersionedState) (v : Nat)
+theorem version_monotone (s : VersionedState) (v : Nat) (s' : VersionedState)
     (h : acceptVersioned s v = some s') :
     s'.version > s.version := by
   simp [acceptVersioned] at h

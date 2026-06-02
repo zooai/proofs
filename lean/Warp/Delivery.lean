@@ -74,7 +74,7 @@ theorem valid_message_succeeds (s : DestState) (msg : WarpMessage)
   simp [processMessage, hsig, hfresh]
 
 /-- Processed nonces grow monotonically -/
-theorem nonces_monotone (s : DestState) (msg : WarpMessage)
+theorem nonces_monotone (s : DestState) (msg : WarpMessage) (s' : DestState)
     (h : processMessage s msg = some s') :
     s.processedNonces ⊆ s'.processedNonces := by
   simp [processMessage] at h

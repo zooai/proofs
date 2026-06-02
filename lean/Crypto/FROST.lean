@@ -40,15 +40,15 @@ structure SchnorrSig where
 /-- Verification (abstract Schnorr): s*G = R + H(R,pk,msg)*pk -/
 axiom schnorr_verify : SchnorrSig → Nat → Nat → Bool
 
-/-- Share: each participant holds a secret share -/
-structure Share where
+/-- Share: each participant holds a secret share (index among `n` participants) -/
+structure Share (n : Nat) where
   index : Fin n
   value : Nat
 
 /-- FROST correctness: if t honest participants execute the protocol,
     the resulting signature verifies under the aggregate public key. -/
 axiom frost_correctness :
-  ∀ (p : ThresholdParams) (shares : List Share)
+  ∀ (p : ThresholdParams) (shares : List (Share p.n))
     (msg : Nat) (aggPK : Nat),
     shares.length ≥ p.t →
     -- All shares are valid (from DKG)
@@ -95,7 +95,7 @@ theorem majority_threshold_safe (n : Nat) (hn : n > 0)
     This is a protocol property: the refreshed polynomial has the
     same constant term (same secret) but different shares. -/
 axiom share_refresh_correctness :
-  ∀ (p : ThresholdParams) (_old_shares new_shares : List Share)
+  ∀ (p : ThresholdParams) (_old_shares new_shares : List (Share p.n))
     (aggPK msg : Nat),
     new_shares.length ≥ p.t →
     ∃ (sig : SchnorrSig), schnorr_verify sig aggPK msg = true

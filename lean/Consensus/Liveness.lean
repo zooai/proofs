@@ -68,21 +68,21 @@ structure ConsensusState (p : Params) where
   nodes  : Fin p.n → NodeState
 
 /-- A node has finalized a value -/
-def hasFinalized (s : ConsensusState p) (i : Fin p.n) (v : ValueId) : Prop :=
+def hasFinalized {p : Params} (s : ConsensusState p) (i : Fin p.n) (v : ValueId) : Prop :=
   (s.nodes i).finalized = some v
 
 /-- A node is honest -/
-def isHonest (s : ConsensusState p) (i : Fin p.n) : Prop :=
+def isHonest {p : Params} (s : ConsensusState p) (i : Fin p.n) : Prop :=
   (s.nodes i).honest = true
 
 /-- Count of honest nodes preferring value v -/
-noncomputable def honestPreferring (s : ConsensusState p) (v : ValueId) : Nat :=
+noncomputable def honestPreferring {p : Params} (s : ConsensusState p) (v : ValueId) : Nat :=
   Finset.card (Finset.filter
     (fun i => (s.nodes i).honest = true ∧ (s.nodes i).preference = some v)
     Finset.univ)
 
 /-- Count of honest nodes in the system -/
-noncomputable def honestCount (s : ConsensusState p) : Nat :=
+noncomputable def honestCount {p : Params} (s : ConsensusState p) : Nat :=
   Finset.card (Finset.filter
     (fun i => (s.nodes i).honest = true)
     Finset.univ)

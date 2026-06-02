@@ -28,6 +28,10 @@ import Mathlib.Tactic
 
 namespace Agent.FunctionalAgent
 
+/- Type variables for agent input/output (made explicit; this library builds with
+   `autoImplicit := false`, so these must be declared rather than auto-bound). -/
+variable {α β γ δ : Type}
+
 /-! ## Core Structures -/
 
 /-- An agent is a function from observation to action.
