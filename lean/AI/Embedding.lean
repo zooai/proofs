@@ -49,7 +49,7 @@ theorem deterministic (input : Nat) :
     embed input = embed input := rfl
 
 /-- BATCH: Batch embedding = individual embeddings -/
-def batchEmbed (inputs : List Nat) : List EmbeddingVector :=
+noncomputable def batchEmbed (inputs : List Nat) : List EmbeddingVector :=
   inputs.map embed
 
 theorem batch_length (inputs : List Nat) :
@@ -57,7 +57,7 @@ theorem batch_length (inputs : List Nat) :
   simp [batchEmbed]
 
 theorem batch_preserves (inputs : List Nat) (i : Fin inputs.length) :
-    (batchEmbed inputs)[i] = embed inputs[i] := by
+    (batchEmbed inputs)[i]'(by simp [batchEmbed, i.isLt]) = embed inputs[i] := by
   simp [batchEmbed, List.getElem_map]
 
 /-- 7680 > 1536 (OpenAI ada-002) -/

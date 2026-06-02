@@ -19,7 +19,7 @@
   - Reproducibility is compositional (A repro ∧ B repro → A;B repro)
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.List.Basic
 import Mathlib.Tactic
 
@@ -74,7 +74,7 @@ theorem nonca_file_breaks (p : String) : isReproducible [.file p] = false := rfl
 theorem repro_compose (a b : BuildTrace)
     (ha : isReproducible a = true) (hb : isReproducible b = true) :
     isReproducible (a ++ b) = true := by
-  simp [isReproducible, List.all_append, Bool.and_eq_true]
+  simp only [isReproducible, List.all_append, Bool.and_eq_true]
   exact ⟨ha, hb⟩
 
 /-- CONTAMINATION: one non-repro access contaminates entire build -/
@@ -85,7 +85,7 @@ theorem one_bad_contaminates (prefix_ : BuildTrace) (suffix_ : BuildTrace) :
 /-- DETERMINISM: reproducible builds give same output for same inputs.
     This is the key theorem connecting coeffects to build correctness. -/
 axiom repro_deterministic :
-  ∀ (trace1 trace2 : BuildTrace) (inputHash : Nat),
+  ∀ (trace1 trace2 : BuildTrace) (_inputHash : Nat),
     isReproducible trace1 = true →
     isReproducible trace2 = true →
     -- Same inputs + same CA accesses → same outputs
@@ -100,8 +100,8 @@ def nonReproCount (trace : BuildTrace) : Nat :=
 theorem repro_zero_bad (trace : BuildTrace)
     (h : isReproducible trace = true) :
     nonReproCount trace = 0 := by
-  simp [nonReproCount, isReproducible, List.all_eq_true] at *
-  rw [List.filter_eq_nil]
+  rw [isReproducible, List.all_eq_true] at h
+  rw [nonReproCount, List.length_eq_zero, List.filter_eq_nil_iff]
   intro a ha
   simp [h a ha]
 

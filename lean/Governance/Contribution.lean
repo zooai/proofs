@@ -56,8 +56,10 @@ def contentAddress (c : Contribution) (name : String) : String :=
 def signatureMessage (c : Contribution) : Nat :=
   c.contributor + c.role.toCtorIdx + c.artifactHash + c.timestamp
 
-/-- Signature verification (axiomatized) -/
-axiom verifySig : Nat → Nat → Nat → Bool
+/-- Signature verification primitive. Modeled as an opaque total function
+    (its concrete witness keeps it abstract to callers while introducing no
+    axiom — the kernel accepts it via the supplied default). -/
+opaque verifySig : Nat → Nat → Nat → Bool := fun _ _ _ => true
 
 /-- SBOM+ entry: contribution + compensation weight -/
 structure SBOMEntry where
@@ -72,16 +74,22 @@ abbrev SBOM := List SBOMEntry
 def totalWeight (sbom : SBOM) : Nat :=
   sbom.foldl (fun acc e => acc + e.weight) 0
 
+/-- Helper: folding the weight sum from any start value extracts that start. -/
+theorem foldl_start (sbom : SBOM) (s : Nat) :
+    sbom.foldl (fun acc e => acc + e.weight) s = s + totalWeight sbom := by
+  induction sbom generalizing s with
+  | nil => simp [totalWeight]
+  | cons hd tl ih =>
+    simp only [List.foldl_cons, totalWeight]
+    rw [ih (s + hd.weight), ih (0 + hd.weight)]
+    omega
+
 /-- ADDITIVITY: Concatenating SBOMs adds their weights -/
 theorem weight_additive_cons (e : SBOMEntry) (sbom : SBOM) :
     totalWeight (e :: sbom) = e.weight + totalWeight sbom := by
-  simp [totalWeight, List.foldl_cons]
-  induction sbom generalizing e with
-  | nil => simp [List.foldl]
-  | cons hd tl ih =>
-    simp [List.foldl_cons]
-    rw [ih ⟨hd.contribution, hd.weight, hd.signature⟩]
-    omega
+  show sbom.foldl (fun acc e => acc + e.weight) (0 + e.weight) = e.weight + totalWeight sbom
+  rw [foldl_start sbom (0 + e.weight)]
+  omega
 
 /-- NO DOUBLE COUNTING: Each artifact hash appears at most once -/
 def noDuplicates (sbom : SBOM) : Prop :=

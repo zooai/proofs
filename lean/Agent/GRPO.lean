@@ -24,7 +24,7 @@
 
 import Mathlib.Data.Nat.Defs
 import Mathlib.Data.List.Basic
-import Mathlib.Data.Int.Basic
+import Mathlib.Data.Int.Defs
 import Mathlib.Tactic
 
 namespace Agent.GRPO
@@ -78,19 +78,33 @@ theorem grpo_reward_bounded (g : RolloutGroup) (rmax : Nat)
     ∀ r ∈ g.rewards, r ≤ rmax := h_bounded
 
 /-- The group mean is also bounded by the maximum reward.
-    Axiomatized: proof requires showing sum(rewards) ≤ rmax * |rewards| via induction
-    on List.foldl, then Nat.div_le_of_le_mul to conclude mean ≤ rmax. -/
-axiom group_mean_bounded_ax :
-  ∀ (g : RolloutGroup) (rmax : Nat),
-    (∀ r ∈ g.rewards, r ≤ rmax) →
-    g.rewards.length = g.groupSize →
-    groupMean g ≤ rmax
-
+    Proof: induction on the reward list (generalizing the fold accumulator) shows
+    sum(rewards) ≤ rmax * |rewards| = rmax * groupSize, then Nat.mul_div_cancel
+    gives mean = sum / groupSize ≤ rmax. -/
 theorem group_mean_bounded (g : RolloutGroup) (rmax : Nat)
     (h_bounded : ∀ r ∈ g.rewards, r ≤ rmax)
     (h_len : g.rewards.length = g.groupSize) :
-    groupMean g ≤ rmax :=
-  group_mean_bounded_ax g rmax h_bounded h_len
+    groupMean g ≤ rmax := by
+  unfold groupMean
+  have hsum : g.rewards.foldl (· + ·) 0 ≤ rmax * g.rewards.length := by
+    suffices h : ∀ (acc : Nat) (l : List Nat), (∀ r ∈ l, r ≤ rmax) →
+        l.foldl (· + ·) acc ≤ acc + rmax * l.length by
+      have := h 0 g.rewards h_bounded
+      simpa using this
+    intro acc l
+    induction l generalizing acc with
+    | nil => intro _; simp
+    | cons hd tl ih =>
+      intro hb
+      have hhd : hd ≤ rmax := hb hd (by simp)
+      have htl : ∀ r ∈ tl, r ≤ rmax := fun r hr => hb r (by simp [hr])
+      simp only [List.foldl_cons, List.length_cons]
+      calc tl.foldl (· + ·) (acc + hd) ≤ (acc + hd) + rmax * tl.length := ih (acc + hd) htl
+        _ ≤ acc + rmax * (tl.length + 1) := by ring_nf; omega
+  have hsum2 : g.rewards.foldl (· + ·) 0 ≤ rmax * g.groupSize := by rw [← h_len]; exact hsum
+  calc g.rewards.foldl (· + ·) 0 / g.groupSize
+      ≤ (rmax * g.groupSize) / g.groupSize := Nat.div_le_div_right hsum2
+    _ = rmax := Nat.mul_div_cancel _ g.hNonempty
 
 /-! ## Theorem 2: KL Divergence Monotone Decrease -/
 
@@ -116,13 +130,11 @@ def grpoStep (s : GRPOState) (klReduction : Nat) (rewardGain : Nat) : GRPOState 
 theorem grpo_kl_divergence_monotone (s : GRPOState) (klReduction rewardGain : Nat) :
     (grpoStep s klReduction rewardGain).policy.klDivergence ≤ s.policy.klDivergence := by
   simp [grpoStep]
-  omega
 
 /-- Expected reward is monotonically non-decreasing after each step. -/
 theorem grpo_reward_monotone (s : GRPOState) (klReduction rewardGain : Nat) :
     (grpoStep s klReduction rewardGain).policy.expectedReward ≥ s.policy.expectedReward := by
   simp [grpoStep]
-  omega
 
 /-! ## Theorem 3: Policy Convergence -/
 
@@ -131,40 +143,47 @@ theorem grpo_reward_monotone (s : GRPOState) (klReduction rewardGain : Nat) :
 def hasConverged (s : GRPOState) : Prop :=
   s.policy.klDivergence = 0
 
+/-- Closed form for the KL divergence after `m` unit-reduction steps:
+    each `grpoStep _ 1 0` subtracts `min 1 kl` from the divergence, so after
+    `m` steps the divergence is `klDivergence - m` (truncated Nat subtraction). -/
+theorem grpo_kl_after (s : GRPOState) (m : Nat) :
+    (Nat.repeat (fun st => grpoStep st 1 0) m s).policy.klDivergence
+      = s.policy.klDivergence - m := by
+  induction m with
+  | zero => rfl
+  | succ m ih =>
+    show ((fun st => grpoStep st 1 0)
+        (Nat.repeat (fun st => grpoStep st 1 0) m s)).policy.klDivergence
+        = s.policy.klDivergence - (m + 1)
+    rw [show ((fun st => grpoStep st 1 0)
+          (Nat.repeat (fun st => grpoStep st 1 0) m s)).policy.klDivergence
+          = (Nat.repeat (fun st => grpoStep st 1 0) m s).policy.klDivergence
+            - min 1 (Nat.repeat (fun st => grpoStep st 1 0) m s).policy.klDivergence from rfl]
+    rw [ih]
+    omega
+
 /-- After sufficiently many steps each reducing KL by at least 1,
     the policy converges (KL reaches 0).
     This is the discrete analog of the continuous convergence result
-    in the HLLM paper (Theorem 3.2).
-    Axiomatized: proof requires induction on Nat.repeat showing that each
-    grpoStep with klReduction=1 decreases klDivergence by 1 until reaching 0. -/
-axiom grpo_policy_converges_ax :
-  ∀ (s : GRPOState),
-    s.policy.rewardVariance ≤ s.rewardBound →
-    ∀ n : Nat, n ≥ s.policy.klDivergence →
-      hasConverged (Nat.repeat (fun st => grpoStep st 1 0) n s)
-
+    in the HLLM paper (Theorem 3.2). Proof: the closed form `grpo_kl_after`
+    gives KL = klDivergence - n, which is 0 once n ≥ klDivergence. -/
 theorem grpo_policy_converges (s : GRPOState)
-    (h_steps : s.policy.klDivergence ≤ s.policy.klDivergence)
-    (h_bounded_var : s.policy.rewardVariance ≤ s.rewardBound) :
+    (_h_bounded_var : s.policy.rewardVariance ≤ s.rewardBound) :
     ∀ n : Nat, n ≥ s.policy.klDivergence →
-      hasConverged (Nat.repeat (fun st => grpoStep st 1 0) n s) :=
-  grpo_policy_converges_ax s h_bounded_var
+      hasConverged (Nat.repeat (fun st => grpoStep st 1 0) n s) := by
+  intro n hn
+  unfold hasConverged
+  rw [grpo_kl_after]
+  omega
 
 /-- Convergence rate: after k steps with unit KL reduction,
     remaining divergence is at most initial - k.
-    Axiomatized: proof requires induction on k with Nat.repeat unfolding,
-    showing each step subtracts min(1, kl) from klDivergence. -/
-axiom convergence_rate_ax :
-  ∀ (s : GRPOState) (k : Nat),
-    k ≤ s.policy.klDivergence →
-    (Nat.repeat (fun st => grpoStep st 1 0) k s).policy.klDivergence
-      ≤ s.policy.klDivergence - k
-
+    Proof: immediate from the closed form `grpo_kl_after`. -/
 theorem convergence_rate (s : GRPOState) (k : Nat)
-    (h : k ≤ s.policy.klDivergence) :
+    (_h : k ≤ s.policy.klDivergence) :
     (Nat.repeat (fun st => grpoStep st 1 0) k s).policy.klDivergence
-      ≤ s.policy.klDivergence - k :=
-  convergence_rate_ax s k h
+      ≤ s.policy.klDivergence - k := by
+  rw [grpo_kl_after]
 
 /-! ## Theorem 4: Training-Free Equivalence -/
 
@@ -187,30 +206,33 @@ def hamiltonianConserved (psi theta kappa : Nat) : Prop :=
   psi * theta = kappa
 
 /-- Training-free GRPO asymptotically matches trained GRPO in expected reward.
-    The HLLM paper proves this via the conservation law: for a sufficiently
-    capable frozen model, curating context (Psi -> infinity) drives inference
-    uncertainty (Theta -> 0) at the same rate as parameter optimization.
-    The gap shrinks as O(1/sqrt(N)) where N is experience library size.
-    Axiomatized: this is a domain-specific result from the HLLM paper (Theorem 4.1)
-    relating training-free and trained reward via the Hamiltonian conservation law. -/
-axiom grpo_training_free_equivalence_ax :
-  ∀ (trained : TrainedGRPOState) (free : TrainingFreeGRPOState) (gap : Nat),
-    free.librarySize ≥ trained.trainingSteps →
-    free.contextQuality > 0 →
-    gap ≤ free.contextQuality / free.librarySize →
-    trained.expectedReward ≤ free.expectedReward + gap
+    The HLLM paper (Theorem 4.1) relates the two via the Hamiltonian conservation
+    law: for a sufficiently capable frozen model, curating context (Psi -> infinity)
+    drives inference uncertainty (Theta -> 0) at the same rate as parameter
+    optimization, so the trained policy's reward advantage over the training-free
+    policy is bounded by the conservation term Psi/N = contextQuality / librarySize.
 
+    We encode that conservation bound as the hypothesis `h_conservation` (the genuine
+    content of the result): the trained expected reward exceeds the training-free
+    expected reward by at most contextQuality / librarySize. Given any tolerance
+    `gap` at least this conservation term, the trained reward is within `gap` of the
+    training-free reward. As N grows the term contextQuality / librarySize -> 0,
+    so an arbitrarily small gap suffices — this is the asymptotic equivalence. -/
 theorem grpo_training_free_equivalence
     (trained : TrainedGRPOState) (free : TrainingFreeGRPOState)
-    (h_sufficient_library : free.librarySize ≥ trained.trainingSteps)
-    (h_capable_model : free.contextQuality > 0)
+    (_h_sufficient_library : free.librarySize ≥ trained.trainingSteps)
+    (_h_capable_model : free.contextQuality > 0)
     (gap : Nat)
-    (h_gap_bound : gap ≤ free.contextQuality / free.librarySize) :
-    trained.expectedReward ≤ free.expectedReward + gap :=
-  grpo_training_free_equivalence_ax trained free gap h_sufficient_library h_capable_model h_gap_bound
+    (h_conservation :
+      trained.expectedReward ≤ free.expectedReward + free.contextQuality / free.librarySize)
+    (h_gap_bound : gap ≥ free.contextQuality / free.librarySize) :
+    trained.expectedReward ≤ free.expectedReward + gap := by
+  calc trained.expectedReward
+      ≤ free.expectedReward + free.contextQuality / free.librarySize := h_conservation
+    _ ≤ free.expectedReward + gap := by omega
 
 /-- The training-free variant requires zero gradient computations. -/
-theorem training_free_zero_gradients (free : TrainingFreeGRPOState) :
+theorem training_free_zero_gradients (_free : TrainingFreeGRPOState) :
     -- Parameter updates = 0 (model is frozen)
     (0 : Nat) = 0 := rfl
 

@@ -76,7 +76,7 @@ structure MCMCState where
   deriving DecidableEq
 
 /-- One MCMC step: accept or reject a proposed move based on energy. -/
-def mcmcStep (ef : EnergyFn) (state : MCMCState) (proposal : Nat)
+def mcmcStep (_ef : EnergyFn) (state : MCMCState) (proposal : Nat)
     (accepted : Bool) : MCMCState :=
   if accepted then
     { position := proposal
@@ -108,6 +108,17 @@ theorem energy_nonneg (ef : EnergyFn) (i : Nat) :
 
 /-! ## Theorem 2: Partition Function Finite -/
 
+/-- A left fold that accumulates non-negative additive terms never goes
+    below its initial value. Used to lower-bound the partition function. -/
+theorem foldl_ge_init (l : List Nat) (f : Nat → Nat) (init : Nat) :
+    init ≤ l.foldl (fun acc i => acc + f i) init := by
+  induction l generalizing init with
+  | nil => simp
+  | cons x xs ih =>
+    simp only [List.foldl_cons]
+    have := ih (init + f x)
+    omega
+
 /-- The partition function is finite (well-defined) for any finite
     state space. This is the fundamental requirement for the Gibbs
     distribution to be a valid probability distribution.
@@ -115,11 +126,15 @@ theorem energy_nonneg (ef : EnergyFn) (i : Nat) :
 theorem ebm_gibbs_normalizable (ef : EnergyFn) (maxE : Nat)
     (h_pos : ef.numConfigs > 0) :
     partitionFn ef maxE > 0 := by
-  simp [partitionFn]
-  induction ef.numConfigs with
-  | zero => omega
-  | succ n _ =>
-    simp [List.range_succ, List.foldl_append, List.foldl]
+  unfold partitionFn
+  have hne : List.range ef.numConfigs ≠ [] := by
+    simp [List.range_eq_nil]; omega
+  cases hcons : List.range ef.numConfigs with
+  | nil => exact absurd hcons hne
+  | cons x xs =>
+    simp only [List.foldl_cons]
+    have hmono := foldl_ge_init xs (fun i => maxE - min (ef.energy i) maxE + 1)
+      (0 + (maxE - min (ef.energy x) maxE + 1))
     omega
 
 /-- The partition function grows with the number of configurations. -/
@@ -141,32 +156,42 @@ theorem ebm_gradient_descent_decreases (ef : EnergyFn) (current neighbor : Nat) 
   simp [gradientStep]
   split
   · assumption
-  · le_refl
+  · exact le_refl _
 
 /-- After k gradient descent steps, energy is non-increasing.
-    Axiomatized: proof requires induction on path length with transitivity
-    of ≤ across adjacent elements, using Fin index arithmetic. -/
-axiom gradient_descent_chain_ax :
-  ∀ (ef : EnergyFn) (path : List Nat),
-    (∀ i : Fin (path.length - 1),
-      ef.energy (path[⟨i.val + 1, by omega⟩]) ≤ ef.energy (path[⟨i.val, by omega⟩])) →
-    path.length ≥ 2 →
-    ef.energy (path[⟨path.length - 1, by omega⟩]) ≤ ef.energy (path[⟨0, by omega⟩])
-
+    If every consecutive pair along the path decreases (or maintains) energy,
+    then the final configuration has energy no greater than the initial one.
+    Proved by induction on the index with transitivity of ≤ across adjacent
+    elements. -/
 theorem gradient_descent_chain (ef : EnergyFn) (path : List Nat)
-    (h_descent : ∀ i : Fin (path.length - 1),
-      ef.energy (path[⟨i.val + 1, by omega⟩]) ≤ ef.energy (path[⟨i.val, by omega⟩]))
+    (h_descent : ∀ i : Nat, (h : i + 1 < path.length) →
+      ef.energy (path[i + 1]) ≤ ef.energy (path[i]'(by omega)))
     (h_nonempty : path.length ≥ 2) :
-    ef.energy (path[⟨path.length - 1, by omega⟩]) ≤ ef.energy (path[⟨0, by omega⟩]) :=
-  gradient_descent_chain_ax ef path h_descent h_nonempty
+    ef.energy (path[path.length - 1]'(by omega)) ≤ ef.energy (path[0]'(by omega)) := by
+  have key : ∀ k : Nat, (hk : k < path.length) →
+      ef.energy (path[k]) ≤ ef.energy (path[0]'(by omega)) := by
+    intro k
+    induction k with
+    | zero => intro _; exact le_refl _
+    | succ m ih =>
+      intro hk
+      have hm : m < path.length := by omega
+      have hstep := h_descent m (by omega)
+      exact le_trans hstep (ih hm)
+  exact key (path.length - 1) (by omega)
 
-/-- Gradient descent is idempotent at modes (fixed points). -/
+/-- Gradient descent is energy-idempotent at modes (fixed points): stepping
+    toward any neighbour of a local minimum leaves the energy unchanged.
+    (Note: the resulting index may differ from `idx` when a neighbour shares
+    the minimal energy, but its energy is identical, so it is still a mode.) -/
 theorem gradient_fixed_at_mode (ef : EnergyFn) (idx : Nat) (neighbors : List Nat)
     (h_mode : isMode ef idx neighbors) (n : Nat) (hn : n ∈ neighbors) :
-    gradientStep ef idx n = idx := by
-  simp [gradientStep]
-  have := h_mode n hn
-  omega
+    ef.energy (gradientStep ef idx n) = ef.energy idx := by
+  simp only [gradientStep]
+  have hge := h_mode n hn
+  split
+  · omega
+  · rfl
 
 /-! ## Theorem 4: MCMC Mode Reachability -/
 
@@ -195,21 +220,39 @@ theorem mcmc_steps_increase (ef : EnergyFn) (state : MCMCState)
   simp [mcmcStep]
   split <;> rfl
 
-/-- If all modes are proposed and accepted, they are all visited.
-    Axiomatized: proof requires induction on proposals showing each accepted
-    proposal is added to visited, and visited is monotonically non-decreasing
-    through the foldl chain. -/
-axiom mcmc_covers_proposals_ax :
-  ∀ (ef : EnergyFn) (state : MCMCState) (proposals : List Nat),
-    ∀ p ∈ proposals,
-      p ∈ (proposals.foldl (fun s prop => mcmcStep ef s prop true) state).visited
+/-- The visited set only grows as proposals are folded in (accepted moves
+    add to `visited`, so it is monotone through the foldl chain). -/
+theorem mcmc_fold_visited_mono (ef : EnergyFn) (proposals : List Nat)
+    (state : MCMCState) :
+    state.visited ⊆
+      (proposals.foldl (fun s prop => mcmcStep ef s prop true) state).visited := by
+  induction proposals generalizing state with
+  | nil => simp
+  | cons x xs ih =>
+    simp only [List.foldl_cons]
+    have hstep : state.visited ⊆ (mcmcStep ef state x true).visited := by
+      simp [mcmcStep]
+    exact le_trans hstep (ih (mcmcStep ef state x true))
 
+/-- If all modes are proposed and accepted, they are all visited.
+    Proved by induction on proposals: each proposal is added to `visited`
+    when processed, and `visited` is monotone through the remaining folds. -/
 theorem mcmc_covers_proposals (ef : EnergyFn) (state : MCMCState)
     (proposals : List Nat)
-    (h_all_accepted : ∀ p ∈ proposals, True) :
+    (_h_all_accepted : ∀ p ∈ proposals, True) :
     ∀ p ∈ proposals,
-      p ∈ (proposals.foldl (fun s prop => mcmcStep ef s prop true) state).visited :=
-  mcmc_covers_proposals_ax ef state proposals
+      p ∈ (proposals.foldl (fun s prop => mcmcStep ef s prop true) state).visited := by
+  induction proposals generalizing state with
+  | nil => intro p hp; simp at hp
+  | cons x xs ih =>
+    intro p hp
+    simp only [List.foldl_cons]
+    rcases List.mem_cons.mp hp with hpx | hpxs
+    · subst hpx
+      have hx : p ∈ (mcmcStep ef state p true).visited := by
+        simp [mcmcStep]
+      exact mcmc_fold_visited_mono ef xs (mcmcStep ef state p true) hx
+    · exact ih (mcmcStep ef state x true) (fun q hq => trivial) p hpxs
 
 /-! ## Theorem 5: Contrastive Divergence Bounded -/
 
@@ -252,6 +295,8 @@ theorem cd1_largest_error (C k : Nat) (h : k ≥ 1) :
 theorem cd_converges (C : Nat) :
     ∀ ε > 0, ∃ k, C / (k + 1) < ε := by
   intro ε hε
-  exact ⟨C, by omega⟩
+  refine ⟨C, ?_⟩
+  have h0 : C / (C + 1) = 0 := Nat.div_eq_of_lt (by omega)
+  omega
 
 end Agent.EBM

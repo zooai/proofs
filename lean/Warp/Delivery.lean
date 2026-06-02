@@ -21,7 +21,7 @@
   - Combined: exactly-once delivery
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.Finset.Basic
 import Mathlib.Tactic
 
@@ -78,8 +78,8 @@ theorem nonces_monotone (s : DestState) (msg : WarpMessage)
     (h : processMessage s msg = some s') :
     s.processedNonces ⊆ s'.processedNonces := by
   simp [processMessage] at h
-  split at h <;> simp_all
-  split at h <;> simp_all
+  obtain ⟨_, _, heq⟩ := h
+  subst heq
   exact Finset.subset_union_left
 
 end Warp.Delivery

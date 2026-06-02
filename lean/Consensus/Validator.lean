@@ -18,7 +18,7 @@
   - Minimum stake enforced
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.List.Basic
 import Mathlib.Tactic
 
@@ -46,15 +46,17 @@ def votingPower (v : Validator) (totalStake : Nat) : Nat :=
 def slash (v : Validator) (penalty : Nat) : Validator :=
   { v with slashed := v.slashed + min penalty (v.stake - v.slashed) }
 
-/-- SLASHING BOUNDED: Cannot lose more than stake -/
-theorem slash_bounded (v : Validator) (penalty : Nat) :
+/-- SLASHING BOUNDED: Cannot lose more than stake.
+    Requires the structural invariant that prior slashing has not
+    already exceeded the stake (`v.slashed ≤ v.stake`). -/
+theorem slash_bounded (v : Validator) (penalty : Nat) (hinv : v.slashed ≤ v.stake) :
     (slash v penalty).slashed ≤ v.stake := by
-  simp [slash]; omega
+  simp only [slash]; omega
 
 /-- SLASHING MONOTONE: Slashed amount only increases -/
 theorem slash_monotone (v : Validator) (penalty : Nat) :
     (slash v penalty).slashed ≥ v.slashed := by
-  simp [slash]; omega
+  simp [slash]
 
 /-- HONEST NEVER SLASHED: Only provable misbehavior triggers slash.
     This is a protocol property (axiomatized). -/
@@ -74,8 +76,9 @@ theorem below_minimum_rejected (vs : ValidatorSet) (v : Validator)
 theorem more_stake_more_power (v1 v2 : Validator) (total : Nat)
     (h : v1.stake > v2.stake) (ht : total > 0) :
     votingPower v1 total ≥ votingPower v2 total := by
-  simp [votingPower, ht, Nat.pos_of_ne_zero (by omega)]
-  exact Nat.div_le_div_right (by omega)
+  have htne : total ≠ 0 := by omega
+  simp only [votingPower, htne, if_false]
+  exact Nat.div_le_div_right (Nat.mul_le_mul_right 1000 (le_of_lt h))
 
 /-- TOTAL STAKE: Sum of all validator stakes -/
 def computeTotalStake (vs : List Validator) : Nat :=

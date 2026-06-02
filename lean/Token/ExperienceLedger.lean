@@ -123,35 +123,51 @@ def burn (s : TokenState) (accountId : Nat) (amount : Nat) : Option TokenState :
       some { accounts := accounts'
              totalSupply := s.totalSupply - amount }
 
-/-- Burning correctly reduces total supply by the burned amount.
-    Axiomatized: proof requires case analysis on List.find? and conditional branching
-    in the burn function, which involves decidable equality on Nat and list membership. -/
-axiom burn_reduces_supply_ax :
-  ∀ (s : TokenState) (accountId : Nat) (amount : Nat) (s' : TokenState),
-    burn s accountId amount = some s' →
-    s'.totalSupply = s.totalSupply - amount
-
+/-- Burning correctly reduces total supply by the burned amount. -/
 theorem burn_reduces_supply (s : TokenState) (accountId : Nat) (amount : Nat)
     (s' : TokenState)
     (h_burn : burn s accountId amount = some s') :
-    s'.totalSupply = s.totalSupply - amount :=
-  burn_reduces_supply_ax s accountId amount s' h_burn
+    s'.totalSupply = s.totalSupply - amount := by
+  simp only [burn] at h_burn
+  split at h_burn
+  · exact absurd h_burn (by simp)
+  · split at h_burn
+    · exact absurd h_burn (by simp)
+    · injection h_burn with h_eq; subst h_eq; rfl
 
 /-- Burning with amount > balance fails.
-    Axiomatized: proof requires reasoning about List.find? returning the specific
-    account from the membership proof and then applying the balance check. -/
-axiom burn_insufficient_fails_ax :
-  ∀ (s : TokenState) (accountId : Nat) (amount : Nat) (acc : Account),
-    acc ∈ s.accounts ∧ acc.id = accountId →
-    acc.balance < amount →
-    burn s accountId amount = none
 
+    STATEMENT CHANGED: this requires a uniqueness hypothesis on account ids.
+    `burn` checks the balance of the account returned by `List.find?`, which is
+    the *first* account whose id matches `accountId`. If `s.accounts` could
+    contain two distinct accounts with the same id, the supplied `acc` (with
+    insufficient balance) need not be the one `find?` returns, and burn could
+    succeed — so the original statement is false in general. We add the natural
+    registry invariant that account ids are pairwise distinct, under which the
+    matched account is exactly `acc`. -/
 theorem burn_insufficient_fails (s : TokenState) (accountId : Nat) (amount : Nat)
     (acc : Account)
+    (h_unique : s.accounts.Pairwise (fun a b => a.id ≠ b.id))
     (h_found : acc ∈ s.accounts ∧ acc.id = accountId)
     (h_insufficient : acc.balance < amount) :
-    burn s accountId amount = none :=
-  burn_insufficient_fails_ax s accountId amount acc h_found h_insufficient
+    burn s accountId amount = none := by
+  obtain ⟨h_mem, h_id⟩ := h_found
+  simp only [burn]
+  cases hf : s.accounts.find? (fun a => a.id == accountId) with
+  | none => rfl
+  | some acc₀ =>
+    -- the matched account is in the list and has the queried id
+    have hmem₀ : acc₀ ∈ s.accounts := List.mem_of_find?_eq_some hf
+    have hid₀ : acc₀.id = accountId := by
+      simpa using List.find?_some (l := s.accounts) (p := fun a => a.id == accountId) hf
+    -- by uniqueness of ids, the matched account equals the supplied one
+    have hsymm : Symmetric (fun a b : Account => a.id ≠ b.id) := fun _ _ h => h.symm
+    have heq : acc₀ = acc := by
+      by_contra hne
+      exact (List.Pairwise.forall hsymm h_unique hmem₀ h_mem hne) (by rw [hid₀, h_id])
+    subst heq
+    simp only
+    rw [if_pos h_insufficient]
 
 /-! ## Theorem 4: Transfer Preserves Total -/
 
@@ -171,36 +187,46 @@ def transfer (s : TokenState) (from_ to_ amount : Nat) : Option TokenState :=
              totalSupply := s.totalSupply }
 
 /-- Transfers do not change total supply. The sender's loss is exactly
-    the receiver's gain.
-    Axiomatized: proof requires case analysis on List.find? result and conditional
-    branching with decidable equality on Nat within the transfer function. -/
-axiom transfer_preserves_total_ax :
-  ∀ (s : TokenState) (from_ to_ amount : Nat) (s' : TokenState),
-    transfer s from_ to_ amount = some s' →
-    from_ ≠ to_ →
-    s'.totalSupply = s.totalSupply
-
+    the receiver's gain. -/
 theorem transfer_preserves_total (s : TokenState) (from_ to_ amount : Nat)
     (s' : TokenState)
     (h_transfer : transfer s from_ to_ amount = some s')
     (h_diff : from_ ≠ to_) :
-    s'.totalSupply = s.totalSupply :=
-  transfer_preserves_total_ax s from_ to_ amount s' h_transfer h_diff
+    s'.totalSupply = s.totalSupply := by
+  simp only [transfer] at h_transfer
+  split at h_transfer
+  · exact absurd h_transfer (by simp)
+  · split at h_transfer
+    · exact absurd h_transfer (by simp)
+    · injection h_transfer with h_eq; subst h_eq; rfl
 
 /-- Transfer fails with insufficient balance.
-    Axiomatized: proof requires showing List.find? returns the specific account
-    matching the membership and id proofs, then applying the balance comparison. -/
-axiom transfer_insufficient_fails_ax :
-  ∀ (s : TokenState) (from_ to_ amount : Nat) (snd : Account),
-    snd ∈ s.accounts ∧ snd.id = from_ →
-    snd.balance < amount →
-    transfer s from_ to_ amount = none
 
+    STATEMENT CHANGED: like `burn_insufficient_fails`, this needs the account-id
+    uniqueness invariant. `transfer` checks the balance of the account returned
+    by `List.find?` on `from_` (the first id-match); if ids were not distinct the
+    supplied under-funded `snd` need not be that account and the transfer could
+    succeed. Under pairwise-distinct ids the matched sender is exactly `snd`. -/
 theorem transfer_insufficient_fails (s : TokenState) (from_ to_ amount : Nat)
     (snd : Account)
+    (h_unique : s.accounts.Pairwise (fun a b => a.id ≠ b.id))
     (h_found : snd ∈ s.accounts ∧ snd.id = from_)
     (h_insufficient : snd.balance < amount) :
-    transfer s from_ to_ amount = none :=
-  transfer_insufficient_fails_ax s from_ to_ amount snd h_found h_insufficient
+    transfer s from_ to_ amount = none := by
+  obtain ⟨h_mem, h_id⟩ := h_found
+  simp only [transfer]
+  cases hf : s.accounts.find? (fun a => a.id == from_) with
+  | none => rfl
+  | some snd₀ =>
+    have hmem₀ : snd₀ ∈ s.accounts := List.mem_of_find?_eq_some hf
+    have hid₀ : snd₀.id = from_ := by
+      simpa using List.find?_some (l := s.accounts) (p := fun a => a.id == from_) hf
+    have hsymm : Symmetric (fun a b : Account => a.id ≠ b.id) := fun _ _ h => h.symm
+    have heq : snd₀ = snd := by
+      by_contra hne
+      exact (List.Pairwise.forall hsymm h_unique hmem₀ h_mem hne) (by rw [hid₀, h_id])
+    subst heq
+    simp only
+    rw [if_pos h_insufficient]
 
 end Token.ExperienceLedger

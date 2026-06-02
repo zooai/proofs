@@ -110,12 +110,12 @@ theorem add_preserves_consistency (beliefs : BeliefSet) (nm : NegationMap)
     rw [Finset.mem_union, Finset.mem_singleton] at h_neg
     rcases h_neg with h_neg | h_neg
     · exact h_consistent q hq h_neg
-    · exact h_not_neg_of_any q hq h_neg
+    · exact h_not_neg_of_any q hq h_neg.symm
   · intro h_neg
     rw [Finset.mem_union, Finset.mem_singleton] at h_neg
     rcases h_neg with h_neg | h_neg
     · exact h_no_neg h_neg
-    · exact nm.hDistinct p h_neg
+    · exact nm.hDistinct _ h_neg
 
 /-- The empty belief set is trivially consistent. -/
 theorem empty_consistent (nm : NegationMap) : isConsistent ∅ nm := by
@@ -147,7 +147,7 @@ theorem empty_plan_sound (problem : PlanProblem)
     (h_goal : goalSatisfied problem.initial problem.goal) :
     planSound problem [] := by
   constructor
-  · intro i; exact Fin.elim0 ⟨i.val, by omega⟩
+  · intro i; exact absurd i.isLt (by simp)
   · exact h_goal
 
 /-- A single-action plan is sound if preconditions are met and
@@ -158,11 +158,11 @@ theorem single_action_sound (problem : PlanProblem) (a : PlanAction)
     planSound problem [a] := by
   constructor
   · intro ⟨i, hi⟩
-    simp at hi
+    simp only [List.length_singleton] at hi
     interval_cases i
-    simp [applyPlan, preconditionsMet]
-    exact h_pre
-  · simp [applyPlan]
+    · simp only [List.take_zero, applyPlan, List.getElem_cons_zero]
+      exact h_pre
+  · simp only [applyPlan]
     exact h_goal
 
 /-! ## Theorem 3: Plan Completeness -/
@@ -183,7 +183,7 @@ theorem plan_completeness (planner : Planner)
     (problem : PlanProblem)
     (existingPlan : Plan)
     (h_exists : planSound problem existingPlan)
-    /-- The planner is complete -/
+    -- The planner is complete
     (h_complete : ∀ prob, (∃ p, planSound prob p) → planner.plan prob ≠ none) :
     ∃ p, planner.plan problem = some p := by
   have h := h_complete problem ⟨existingPlan, h_exists⟩
@@ -246,9 +246,11 @@ theorem achieved_dropped (state : BDIState) (nm : NegationMap)
     (intention : Prop')
     (h_achieved : isAchieved state intention) :
     intention ∉ (deliberate state nm).intentions := by
-  simp [deliberate, Finset.mem_filter, isAchieved] at *
-  intro _
-  exact h_achieved
+  simp only [deliberate, Finset.mem_filter, isAchieved] at *
+  intro h
+  simp only [Bool.and_eq_true, decide_eq_true_eq, Bool.not_eq_true',
+    decide_eq_false_iff_not] at h
+  exact h.2.1 h_achieved
 
 /-- Impossible intentions are dropped. -/
 theorem impossible_dropped (state : BDIState) (nm : NegationMap)
@@ -280,7 +282,7 @@ theorem logical_consequence_monotone (beliefs₁ beliefs₂ : BeliefSet)
 
 /-- Consequences of the empty set are empty (no premises, no conclusions). -/
 theorem empty_no_consequences (rules : Prop' → Finset Prop')
-    (h_no_axioms : ∀ p, rules p = ∅ → True) :
+    (_h_no_axioms : ∀ p, rules p = ∅ → True) :
     consequences ∅ rules = ∅ := by
   simp [consequences]
 

@@ -58,7 +58,7 @@ theorem model_stays_frozen (s : PersonalizationState) (expHash : Nat)
 /-- CONTEXT IMPROVES: More experiences → better context -/
 theorem context_monotone (s : PersonalizationState) (expHash : Nat) :
     (addExperience s expHash).contextQuality > s.contextQuality := by
-  simp [addExperience]; omega
+  simp only [addExperience]; omega
 
 /-- EXPERIENCE COUNT GROWS -/
 theorem experiences_grow (s : PersonalizationState) (expHash : Nat) :
@@ -72,7 +72,7 @@ def canShare (s : PersonalizationState) (requesterId : Nat) : Bool :=
   (s.profile.privacyLevel == 1 && requesterId == s.profile.userId)  -- simplified
 
 theorem private_not_shared (s : PersonalizationState) (requesterId : Nat)
-    (h : s.profile.privacyLevel = 2) (h_diff : requesterId ≠ s.profile.userId) :
+    (h : s.profile.privacyLevel = 2) (_h_diff : requesterId ≠ s.profile.userId) :
     canShare s requesterId = false := by
   simp [canShare, h]
 

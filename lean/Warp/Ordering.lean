@@ -21,7 +21,7 @@
   - No inversion: if A < B on source, A processed before B on destination
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace Warp.Ordering
@@ -58,9 +58,9 @@ theorem version_monotone (s : VersionedState) (v : Nat)
     (h : acceptVersioned s v = some s') :
     s'.version > s.version := by
   simp [acceptVersioned] at h
-  split at h
-  · simp_all
-  · simp at h
+  obtain ⟨hlt, heq⟩ := h
+  subst heq
+  exact hlt
 
 /-- Stale versions are rejected -/
 theorem stale_rejected (s : VersionedState) (v : Nat)
@@ -78,6 +78,6 @@ theorem precedes_trans (a b c : OrderedMessage)
 
 /-- Precedes is irreflexive -/
 theorem precedes_irrefl (a : OrderedMessage) : ¬precedes a a := by
-  simp [precedes]; omega
+  simp [precedes]
 
 end Warp.Ordering

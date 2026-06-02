@@ -65,7 +65,7 @@ structure Block where
   signers : Finset Nat
   /-- The value being finalized (e.g., state root) -/
   stateRoot : Nat
-  deriving DecidableEq, Repr
+  deriving DecidableEq
 
 /-- Network parameters. -/
 structure NetworkParams where
@@ -102,14 +102,14 @@ def honestCount (q : Finset Nat) (isHonest : Nat → Bool) : Nat :=
 theorem poai_safety (params : NetworkParams)
     (b₁ b₂ : Block)
     (isHonest : Nat → Bool)
-    (h_same_height : b₁.height = b₂.height)
-    (h_q1 : isQuorum params b₁.signers)
-    (h_q2 : isQuorum params b₂.signers)
-    (h_all_in_range : ∀ v ∈ b₁.signers ∪ b₂.signers, v < params.n)
-    /-- Honest validators never sign conflicting blocks at the same height -/
+    (_h_same_height : b₁.height = b₂.height)
+    (_h_q1 : isQuorum params b₁.signers)
+    (_h_q2 : isQuorum params b₂.signers)
+    (_h_all_in_range : ∀ v ∈ b₁.signers ∪ b₂.signers, v < params.n)
+    -- Honest validators never sign conflicting blocks at the same height
     (h_honest_consistent : ∀ v, isHonest v = true →
       v ∈ b₁.signers → v ∈ b₂.signers → b₁.stateRoot = b₂.stateRoot)
-    /-- Any two quorums intersect in at least one honest validator -/
+    -- Any two quorums intersect in at least one honest validator
     (h_intersection : ∃ v ∈ b₁.signers ∩ b₂.signers, isHonest v = true) :
     b₁.stateRoot = b₂.stateRoot := by
   obtain ⟨v, hv_inter, hv_honest⟩ := h_intersection
@@ -133,11 +133,11 @@ structure PartialSynchrony where
 
     Specifically: after GST + delta, a new block will be finalized at height h. -/
 theorem poai_liveness (params : NetworkParams)
-    (ps : PartialSynchrony)
+    (_ps : PartialSynchrony)
     (isHonest : Nat → Bool)
-    /-- There are enough honest validators to form a quorum -/
-    (h_enough_honest : honestCount (Finset.range params.n) isHonest ≥ params.quorumSize)
-    /-- Honest validators propose blocks when it is their turn -/
+    -- There are enough honest validators to form a quorum
+    (_h_enough_honest : honestCount (Finset.range params.n) isHonest ≥ params.quorumSize)
+    -- Honest validators propose blocks when it is their turn
     (h_honest_propose : ∀ h : Nat, ∃ b : Block, b.height = h ∧
       isQuorum params b.signers) :
     ∀ h : Nat, ∃ b : Block, b.height = h ∧ isQuorum params b.signers :=
@@ -147,6 +147,7 @@ theorem poai_liveness (params : NetworkParams)
     n - f >= 2f + 1 when 3f < n. -/
 theorem honest_quorum_exists (params : NetworkParams) :
     params.n - params.f ≥ params.quorumSize := by
+  have hbft := params.hBFT
   rw [params.hQuorum]
   omega
 
@@ -158,40 +159,50 @@ theorem honest_quorum_exists (params : NetworkParams) :
 
     Furthermore, since at most f validators are Byzantine, the intersection
     must contain at least one honest attester. -/
-/-- Axiomatized: the pigeonhole argument requires Finset.card_union_le and
-    the quorum size constraint |Q1|+|Q2| > n to show the intersection is nonempty.
-    The necessary Finset arithmetic chain is:
-      |Q1 ∩ Q2| = |Q1| + |Q2| - |Q1 ∪ Q2| ≥ (2f+1)+(2f+1) - n = 4f+2-n > f ≥ 1. -/
-axiom poai_quorum_intersection_ax :
-  ∀ (params : NetworkParams) (q₁ q₂ : Finset Nat),
-    isQuorum params q₁ →
-    isQuorum params q₂ →
-    q₁ ⊆ Finset.range params.n →
-    q₂ ⊆ Finset.range params.n →
-    (q₁ ∩ q₂).card ≥ 1
+/- Proven from the definitions via inclusion-exclusion on Finset cardinalities.
+    The arithmetic chain is:
+      |Q1 ∩ Q2| = |Q1| + |Q2| - |Q1 ∪ Q2| ≥ (2f+1)+(2f+1) - n ≥ 1,
+    using `Finset.card_union_add_card_inter` and `|Q1 ∪ Q2| ≤ |range n| = n`.
 
+    STATEMENT CHANGED: added the hypothesis `h_tight : params.n ≤ 3 * params.f + 1`.
+    `NetworkParams` only constrains `3*f < n` (a lower bound on n); with no upper
+    bound on n the claim is FALSE (e.g. n = 100, f = 1: two disjoint size-3 quorums).
+    The canonical BFT regime is n = 3f+1; together with `hBFT : 3*f < n` this
+    hypothesis pins n = 3f+1 and is exactly the standard "optimal resilience"
+    assumption under which quorum intersection holds. -/
 theorem poai_quorum_intersection (params : NetworkParams)
     (q₁ q₂ : Finset Nat)
     (hq₁ : isQuorum params q₁)
     (hq₂ : isQuorum params q₂)
     (h₁_sub : q₁ ⊆ Finset.range params.n)
-    (h₂_sub : q₂ ⊆ Finset.range params.n) :
-    (q₁ ∩ q₂).card ≥ 1 :=
-  poai_quorum_intersection_ax params q₁ q₂ hq₁ hq₂ h₁_sub h₂_sub
+    (h₂_sub : q₂ ⊆ Finset.range params.n)
+    (h_tight : params.n ≤ 3 * params.f + 1) :
+    (q₁ ∩ q₂).card ≥ 1 := by
+  -- Inclusion-exclusion: |q₁ ∪ q₂| + |q₁ ∩ q₂| = |q₁| + |q₂|.
+  have h_ie := Finset.card_union_add_card_inter q₁ q₂
+  -- The union is contained in range n, so its card is at most n.
+  have h_union_sub : q₁ ∪ q₂ ⊆ Finset.range params.n := Finset.union_subset h₁_sub h₂_sub
+  have h_union_le : (q₁ ∪ q₂).card ≤ params.n := by
+    have := Finset.card_le_card h_union_sub
+    rwa [Finset.card_range] at this
+  -- Unfold the quorum-size lower bounds on |q₁| and |q₂| (isQuorum is `card ≥ quorumSize`).
+  have hq₁' : q₁.card ≥ params.quorumSize := hq₁
+  have hq₂' : q₂.card ≥ params.quorumSize := hq₂
+  have hQ := params.hQuorum
+  have hBFT := params.hBFT
+  omega
 
 /-- The intersection of two quorums contains at least one honest validator,
     since the intersection has at least f+1 members but at most f are Byzantine. -/
-/-- Axiomatized: requires showing the intersection has ≥ f+1 members (from
-    poai_quorum_intersection_ax) and at most f are Byzantine, so at least one is honest. -/
-axiom quorum_intersection_has_honest_ax :
-  ∀ (params : NetworkParams) (q₁ q₂ : Finset Nat) (isHonest : Nat → Bool),
-    isQuorum params q₁ →
-    isQuorum params q₂ →
-    q₁ ⊆ Finset.range params.n →
-    q₂ ⊆ Finset.range params.n →
-    (Finset.range params.n |>.filter (fun v => !isHonest v)).card ≤ params.f →
-    ∃ v ∈ q₁ ∩ q₂, isHonest v = true
+/- Proven from the definitions. From inclusion-exclusion the intersection has
+    |q₁ ∩ q₂| ≥ 4f+2-n ≥ f+1 members (using n ≤ 3f+1), while the Byzantine set B
+    has |B| ≤ f. Hence |q₁ ∩ q₂| > |B|, so `(q₁ ∩ q₂) \ B` is nonempty
+    (`Finset.le_card_sdiff` + `Finset.card_pos`); any witness lies in q₁ ∩ q₂ and,
+    being in `range n` but not in B = `filter (¬isHonest) (range n)`, is honest.
 
+    STATEMENT CHANGED: added the hypothesis `h_tight : params.n ≤ 3 * params.f + 1`
+    (same canonical n = 3f+1 BFT assumption as `poai_quorum_intersection`; required
+    here so that |q₁ ∩ q₂| ≥ f+1 strictly exceeds the f Byzantine nodes). -/
 theorem quorum_intersection_has_honest (params : NetworkParams)
     (q₁ q₂ : Finset Nat)
     (isHonest : Nat → Bool)
@@ -199,10 +210,37 @@ theorem quorum_intersection_has_honest (params : NetworkParams)
     (hq₂ : isQuorum params q₂)
     (h₁_sub : q₁ ⊆ Finset.range params.n)
     (h₂_sub : q₂ ⊆ Finset.range params.n)
-    /-- At most f validators are Byzantine -/
-    (h_byzantine_bound : (Finset.range params.n |>.filter (fun v => !isHonest v)).card ≤ params.f) :
-    ∃ v ∈ q₁ ∩ q₂, isHonest v = true :=
-  quorum_intersection_has_honest_ax params q₁ q₂ isHonest hq₁ hq₂ h₁_sub h₂_sub h_byzantine_bound
+    -- At most f validators are Byzantine
+    (h_byzantine_bound : (Finset.range params.n |>.filter (fun v => !isHonest v)).card ≤ params.f)
+    (h_tight : params.n ≤ 3 * params.f + 1) :
+    ∃ v ∈ q₁ ∩ q₂, isHonest v = true := by
+  set B : Finset Nat := (Finset.range params.n).filter (fun v => !isHonest v) with hB
+  -- Lower bound on |q₁ ∩ q₂| via inclusion-exclusion (as in poai_quorum_intersection).
+  have h_ie := Finset.card_union_add_card_inter q₁ q₂
+  have h_union_sub : q₁ ∪ q₂ ⊆ Finset.range params.n := Finset.union_subset h₁_sub h₂_sub
+  have h_union_le : (q₁ ∪ q₂).card ≤ params.n := by
+    have := Finset.card_le_card h_union_sub
+    rwa [Finset.card_range] at this
+  have hq₁' : q₁.card ≥ params.quorumSize := hq₁
+  have hq₂' : q₂.card ≥ params.quorumSize := hq₂
+  have hQ := params.hQuorum
+  have hBFT := params.hBFT
+  -- The intersection strictly outnumbers the Byzantine set: |q₁ ∩ q₂| > |B|.
+  have h_gt : B.card < (q₁ ∩ q₂).card := by omega
+  -- Therefore (q₁ ∩ q₂) \ B is nonempty.
+  have h_sdiff_pos : 0 < ((q₁ ∩ q₂) \ B).card := by
+    have h_le : (q₁ ∩ q₂).card - B.card ≤ ((q₁ ∩ q₂) \ B).card := Finset.le_card_sdiff B (q₁ ∩ q₂)
+    omega
+  obtain ⟨v, hv⟩ := Finset.card_pos.mp h_sdiff_pos
+  rw [Finset.mem_sdiff] at hv
+  obtain ⟨hv_inter, hv_notB⟩ := hv
+  refine ⟨v, hv_inter, ?_⟩
+  -- v is in range n (it is in q₁), and v ∉ B = filter (¬isHonest) (range n), so v is honest.
+  have hv_q₁ : v ∈ q₁ := (Finset.mem_inter.mp hv_inter).1
+  have hv_range : v ∈ Finset.range params.n := h₁_sub hv_q₁
+  rw [hB, Finset.mem_filter, not_and] at hv_notB
+  have := hv_notB hv_range
+  simpa using this
 
 /-! ## Theorem 4: Compute Verification -/
 
@@ -229,7 +267,7 @@ axiom tee_soundness :
 /-- Compute verified: a valid attestation in a finalized block means
     the computation was correctly performed. -/
 theorem poai_compute_verified (b : Block) (a : Attestation)
-    (h_in_block : a ∈ b.attestations)
+    (_h_in_block : a ∈ b.attestations)
     (h_valid : isValidAttestation a) :
     a.teeSignature ≠ 0 ∧ a.qualityScore > 0 := h_valid
 

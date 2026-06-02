@@ -21,7 +21,7 @@
   - Reproducible builds have no time/random accesses
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace Build.Attestation

@@ -24,7 +24,7 @@
   - Convergence: under honest majority, confidence reaches beta in O(beta) rounds
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace Protocol.Wave

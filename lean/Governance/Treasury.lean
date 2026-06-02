@@ -79,9 +79,11 @@ def deposit (s : TreasuryState) (amount : Nat) : TreasuryState :=
 /-- SOLVENCY: balance never goes negative (Nat ensures this structurally) -/
 theorem solvency (s : TreasuryState) (op : TreasuryOp) :
     (execute s op).balance ≤ s.balance ∨ (execute s op).balance = s.balance := by
-  simp [execute]
-  split <;> try exact Or.inr rfl
-  split <;> simp_all <;> split <;> simp_all <;> omega
+  left
+  simp only [execute]
+  split
+  · rfl
+  · split <;> first | rfl | (split <;> simp [Nat.sub_le])
 
 /-- AUTHORIZATION: unapproved ops don't change state -/
 theorem unapproved_noop (s : TreasuryState) (op : TreasuryOp)
@@ -95,8 +97,8 @@ theorem grant_within_budget (s : TreasuryState) (op : TreasuryOp)
     (h_type : op.opType = .grant recipient amount)
     (h_approved : op.approved = true) :
     (execute s op).balance ≤ s.balance := by
-  simp [execute, h_approved, h_type]
-  split <;> omega
+  simp only [execute, h_approved, h_type, Bool.not_true, Bool.false_eq_true, if_false]
+  split <;> simp
 
 /-- DEPOSIT INCREASES BALANCE -/
 theorem deposit_increases (s : TreasuryState) (amount : Nat) :
@@ -116,6 +118,7 @@ theorem empty_blocks_grants (op : TreasuryOp)
     (recipient amount : Nat) (h_type : op.opType = .grant recipient amount)
     (h_amount : amount > 0) (h_approved : op.approved = true) :
     execute ⟨0, 0, 0, 0, []⟩ op = ⟨0, 0, 0, 0, []⟩ := by
-  simp [execute, h_approved, h_type]
+  simp only [execute, h_approved, h_type, Bool.not_true, Bool.false_eq_true, if_false]
+  rw [if_neg (by omega)]
 
 end Governance.Treasury

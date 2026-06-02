@@ -26,7 +26,7 @@
   - Threshold: t-of-n sharing
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace Crypto.Corona
@@ -53,9 +53,9 @@ structure CoronaSig where
 
 /-- Correctness: honest threshold execution produces valid signature -/
 axiom corona_correctness :
-  ∀ (lwe : LWEParams) (tp : ThresholdParams) (signers : Nat),
+  ∀ (_lwe : LWEParams) (tp : ThresholdParams) (signers : Nat),
     signers ≥ tp.t →
-    ∃ (sig : CoronaSig), True  -- signature verifies
+    ∃ (_sig : CoronaSig), True  -- signature verifies
 
 /-- PQ unforgeability: under LWE hardness assumption,
     no quantum adversary can forge with fewer than t shares. -/
@@ -74,17 +74,17 @@ theorem noise_bound_correct
     (noise : Nat)
     (hnoise : noise ≤ lwe.q / 4) :
     noise < lwe.q := by
-  omega
+  have := lwe.hq; omega
 
 /-- Threshold property: t-of-n requires at least t signers -/
 theorem threshold_minimum (tp : ThresholdParams) (signers : Nat)
     (h : signers < tp.t) :
-    signers < tp.n := by omega
+    signers < tp.n := by have := tp.ht; omega
 
 /-- Robustness: with n signers and up to n-t failures, still have t honest -/
 theorem corona_robustness (tp : ThresholdParams) (failures : Nat)
     (h : failures ≤ tp.n - tp.t) :
-    tp.n - failures ≥ tp.t := by omega
+    tp.n - failures ≥ tp.t := by have := tp.ht; omega
 
 /-- Signature size is bounded -/
 theorem sig_bounded (sig : CoronaSig) : sig.size ≤ 20000 := sig.hsize

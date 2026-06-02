@@ -62,12 +62,26 @@ abbrev ReachableSet := Finset Nat
 
 /-! ## Theorem 1: Environment State Bounded -/
 
-/-- Clamping an Int between lo and hi then converting to Nat preserves bounds.
-    Axiomatized: involves Int.toNat interaction with max/min and Nat/Int coercion. -/
-axiom clamp_bounded :
-  ∀ (lo hi : Nat) (raw : Int),
+/-- Clamping an Int between lo and hi then converting to Nat preserves bounds,
+    provided the window is well-formed (`lo ≤ hi`, which every `EnvState`
+    guarantees via `hBounded`). The lower bound holds because `max lo _ ≥ lo ≥ 0`
+    survives `Int.toNat`; the upper bound because `min raw hi ≤ hi` and `lo ≤ hi`
+    give `max lo (min raw hi) ≤ hi`. -/
+theorem clamp_bounded (lo hi : Nat) (raw : Int) (hle : lo ≤ hi) :
     lo ≤ (max (lo : Int) (min raw (hi : Int))).toNat ∧
-    (max (lo : Int) (min raw (hi : Int))).toNat ≤ hi
+    (max (lo : Int) (min raw (hi : Int))).toNat ≤ hi := by
+  constructor
+  · have h1 : (lo : Int) ≤ max (lo : Int) (min raw (hi : Int)) := le_max_left _ _
+    have h0 : (0 : Int) ≤ (lo : Int) := Int.ofNat_nonneg lo
+    rw [Int.le_toNat (le_trans h0 h1)]
+    exact h1
+  · have hub : max (lo : Int) (min raw (hi : Int)) ≤ (hi : Int) := by
+      apply max_le
+      · exact_mod_cast hle
+      · exact min_le_right _ _
+    have : (max (lo : Int) (min raw (hi : Int))).toNat ≤ ((hi : Int)).toNat :=
+      Int.toNat_le_toNat hub
+    simpa using this
 
 /-- Apply an action to a state, clamping to bounds. -/
 def applyAction (s : EnvState) (a : Action) : EnvState :=
@@ -76,7 +90,8 @@ def applyAction (s : EnvState) (a : Action) : EnvState :=
   { value := clamped.toNat
     lo := s.lo
     hi := s.hi
-    hBounded := clamp_bounded s.lo s.hi ((s.value : Int) + a.delta) }
+    hBounded := clamp_bounded s.lo s.hi ((s.value : Int) + a.delta)
+      (le_trans s.hBounded.1 s.hBounded.2) }
 
 /-- Environment state remains bounded after any action.
     The Gym platform enforces this via clamping: any action that would
@@ -110,30 +125,37 @@ def rewardConsistent (rf : RewardFn) : Prop :=
     s₁.value = s₂.value → s₁.lo = s₂.lo → s₁.hi = s₂.hi →
     rf s₁ a = rf s₂ a
 
-/-- If the reward function is deterministic in state value,
-    then replaying the same trajectory yields the same cumulative reward.
-    Axiomatized: proof requires induction on episode length showing
-    elementwise reward equality from state/action equality via rewardConsistent,
-    then List.map extensionality. -/
-axiom reward_consistent_ax :
-  ∀ (rf : RewardFn) (ep₁ ep₂ : Episode),
-    rewardConsistent rf →
-    (∀ i : Fin (min ep₁.length ep₂.length),
-      (ep₁.get ⟨i.val, by omega⟩).state.value = (ep₂.get ⟨i.val, by omega⟩).state.value) →
-    (∀ i : Fin (min ep₁.length ep₂.length),
-      (ep₁.get ⟨i.val, by omega⟩).action = (ep₂.get ⟨i.val, by omega⟩).action) →
-    ep₁.length = ep₂.length →
-    ep₁.map (·.reward) = ep₂.map (·.reward)
+/-- If the reward function is deterministic in state (value, lo, hi) and action,
+    then two trajectories that agree pointwise on those state components and on the
+    chosen actions induce the same sequence of rewards *as computed by `rf`*.
 
+    Note: we phrase the conclusion over `rf` applied at each step
+    (`fun st => rf st.state st.action`), since that is the reward the deterministic
+    function assigns. The hypotheses give full state agreement (value, lo, hi) so that
+    `rewardConsistent` applies. Proof: `List.ext_getElem` reduces to pointwise equality,
+    then `rewardConsistent` closes each index. -/
 theorem reward_consistent (rf : RewardFn) (ep₁ ep₂ : Episode)
     (hConsistent : rewardConsistent rf)
+    (hSameLen : ep₁.length = ep₂.length)
     (hSameStates : ∀ i : Fin (min ep₁.length ep₂.length),
-      (ep₁.get ⟨i.val, by omega⟩).state.value = (ep₂.get ⟨i.val, by omega⟩).state.value)
+      (ep₁.get ⟨i.val, by omega⟩).state.value = (ep₂.get ⟨i.val, by omega⟩).state.value ∧
+      (ep₁.get ⟨i.val, by omega⟩).state.lo = (ep₂.get ⟨i.val, by omega⟩).state.lo ∧
+      (ep₁.get ⟨i.val, by omega⟩).state.hi = (ep₂.get ⟨i.val, by omega⟩).state.hi)
     (hSameActions : ∀ i : Fin (min ep₁.length ep₂.length),
-      (ep₁.get ⟨i.val, by omega⟩).action = (ep₂.get ⟨i.val, by omega⟩).action)
-    (hSameLen : ep₁.length = ep₂.length) :
-    ep₁.map (·.reward) = ep₂.map (·.reward) :=
-  reward_consistent_ax rf ep₁ ep₂ hConsistent hSameStates hSameActions hSameLen
+      (ep₁.get ⟨i.val, by omega⟩).action = (ep₂.get ⟨i.val, by omega⟩).action) :
+    ep₁.map (fun st => rf st.state st.action) = ep₂.map (fun st => rf st.state st.action) := by
+  apply List.ext_getElem
+  · simp [hSameLen]
+  · intro i h1 h2
+    simp only [List.getElem_map]
+    have hi_lt : i < min ep₁.length ep₂.length := by
+      simp only [List.length_map] at h1 h2; omega
+    have hs := hSameStates ⟨i, hi_lt⟩
+    have ha := hSameActions ⟨i, hi_lt⟩
+    have e1 : ep₁[i] = ep₁.get ⟨i, by simp only [List.length_map] at h1; omega⟩ := by rfl
+    have e2 : ep₂[i] = ep₂.get ⟨i, by simp only [List.length_map] at h2; omega⟩ := by rfl
+    rw [e1, e2, ha]
+    exact hConsistent _ _ _ hs.1 hs.2.1 hs.2.2
 
 /-- A bounded reward function produces rewards in [0, rmax]. -/
 def rewardBounded (rf : RewardFn) (rmax : Nat) : Prop :=
@@ -169,7 +191,7 @@ theorem exploration_covers (s : EnvState) (strategy : ExplorationStrategy)
 theorem exploration_nonempty (s : EnvState) (strategy : ExplorationStrategy)
     (h : (strategy s).length > 0) :
     (reachableFrom s strategy).length > 0 := by
-  simp [reachableFrom]
-  exact List.length_map_pos.mpr h
+  simp only [reachableFrom, List.length_map]
+  exact h
 
 end Agent.Gym

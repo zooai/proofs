@@ -69,7 +69,7 @@ theorem params_unchanged (s : HLLMState) (delta : Nat) :
 /-- CONTEXT IMPROVES: Quality monotonically increases -/
 theorem context_monotone (s : HLLMState) (delta : Nat) :
     (improveContext s delta).contextQuality ≥ s.contextQuality := by
-  simp [improveContext]; omega
+  simp only [improveContext]; omega
 
 /-- CONSERVATION: The new state satisfies Ψ·Θ = κ' -/
 theorem improved_conserved (s : HLLMState) (delta : Nat) :
@@ -81,15 +81,15 @@ theorem improved_conserved (s : HLLMState) (delta : Nat) :
 theorem training_free_cost : (1 : Nat) ≤ 1 := Nat.le_refl 1
 
 /-- GROUP RELATIVE: Mean-centered rewards reduce variance -/
-theorem group_relative_zero_sum (g : ExperienceGroup) (h : ¬g.isEmpty) :
+theorem group_relative_zero_sum (g : ExperienceGroup) (_h : ¬g.isEmpty) :
     -- Sum of advantages relative to mean ≈ 0
     -- (exactly 0 for integer mean, approximately 0 otherwise)
-    groupMean g ≥ 0 := by
-  simp [groupMean, h]; omega
+    groupMean g ≥ 0 :=
+  Nat.zero_le _
 
 /-- CROSS-DOMAIN: Experiences from domain A can be evaluated in domain B.
     Transfer works because experiences are semantic, not parametric. -/
-theorem cross_domain_compatible (e : Experience) (newDomain : String) :
+theorem cross_domain_compatible (e : Experience) (_newDomain : String) :
     -- Experience structure is domain-agnostic
     e.reward = e.reward := rfl
 

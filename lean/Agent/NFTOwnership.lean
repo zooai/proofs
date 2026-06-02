@@ -47,7 +47,6 @@ structure AgentNFT where
   delegates : Address → CapSet
   /-- Whether the agent is active (not revoked) -/
   active : Bool
-  deriving DecidableEq
 
 /-- The empty capability set. -/
 def emptyCaps : CapSet := ∅
@@ -83,11 +82,11 @@ theorem transfer_clears_delegates (nft : AgentNFT) (newOwner : Address) (addr : 
 
 /-- Delegate a subset of capabilities to an address.
     The delegated set must be a subset of the agent's capabilities. -/
-def delegate (nft : AgentNFT) (to : Address) (caps : CapSet)
+def delegate (nft : AgentNFT) (to_ : Address) (caps : CapSet)
     (_ : caps ⊆ nft.capabilities) : AgentNFT :=
   { nft with
     delegates := fun addr =>
-      if addr = to then nft.delegates to ∪ caps
+      if addr = to_ then nft.delegates to_ ∪ caps
       else nft.delegates addr }
 
 /-- Transitive delegation: if A delegates to B, and B delegates a subset
@@ -145,24 +144,30 @@ theorem revocation_preserves_id (nft : AgentNFT) :
 /-- A delegate's capabilities are always a subset of the agent's capabilities.
     This is the fundamental no-escalation invariant: an agent can never
     grant more capabilities than it possesses.
-    Axiomatized: the full proof requires an additional invariant that the
-    existing delegate capabilities (nft.delegates to) are already a subset
-    of nft.capabilities. The delegation operation unions old ∪ new caps,
-    and new caps ⊆ capabilities by construction, but old caps need the invariant. -/
-axiom no_escalation_ax :
-  ∀ (nft : AgentNFT) (to : Address) (caps : CapSet)
-    (h : caps ⊆ nft.capabilities),
-    ∀ c ∈ (delegate nft to caps h).delegates to, c ∈ nft.capabilities
 
-theorem no_escalation (nft : AgentNFT) (to : Address) (caps : CapSet)
-    (h : caps ⊆ nft.capabilities) :
-    ∀ c ∈ (delegate nft to caps h).delegates to, c ∈ nft.capabilities :=
-  no_escalation_ax nft to caps h
+    The `delegate` operation sets the delegate's caps to `old ∪ new` where
+    `new = caps ⊆ capabilities` by construction (`h`). For the union to stay
+    within `capabilities`, the pre-existing delegation `nft.delegates to_` must
+    already be bounded — exactly the no-escalation invariant maintained across
+    operations (transfer/revoke reset delegations to `∅`, which trivially
+    satisfies it). We therefore take that invariant as hypothesis `h_inv` and
+    prove the union is bounded honestly. -/
+theorem no_escalation (nft : AgentNFT) (to_ : Address) (caps : CapSet)
+    (h : caps ⊆ nft.capabilities)
+    (h_inv : ∀ c ∈ nft.delegates to_, c ∈ nft.capabilities) :
+    ∀ c ∈ (delegate nft to_ caps h).delegates to_, c ∈ nft.capabilities := by
+  intro c hc
+  have hc' : c ∈ nft.delegates to_ ∪ caps := by
+    simpa only [delegate, if_pos rfl] using hc
+  rw [Finset.mem_union] at hc'
+  rcases hc' with hc' | hc'
+  · exact h_inv c hc'
+  · exact h hc'
 
 /-- Simpler no-escalation: delegated set is bounded by agent capabilities. -/
-theorem no_escalation_set (nft : AgentNFT) (to : Address) (caps : CapSet)
-    (h : caps ⊆ nft.capabilities) :
-    caps ⊆ nft.capabilities := h
+theorem no_escalation_set (_nft : AgentNFT) (_to_ : Address) (caps : CapSet)
+    (h : caps ⊆ _nft.capabilities) :
+    caps ⊆ _nft.capabilities := h
 
 /-- An inactive agent cannot perform any actions.
     This is enforced at the contract level: all action functions

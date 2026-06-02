@@ -53,16 +53,29 @@ theorem append_grows (l : Ledger) (e : Entry) :
 theorem append_preserves (l : Ledger) (e : Entry) (old : Entry)
     (h : old ∈ l.entries) :
     old ∈ (append l e).entries := by
-  simp [append]; exact List.mem_cons_of_mem _ h
+  simp only [append, List.mem_cons]; exact Or.inr h
 
-/-- CONTENT ADDRESSING: Same hash → same content -/
-axiom content_addressed :
-  ∀ (e1 e2 : Entry), e1.hash = e2.hash → e1 = e2
+/-- CONTENT ADDRESSING: a ledger is content-addressed when, among its own
+    entries, the hash uniquely determines the entry.
+
+    NOTE: this is a *property a well-formed ledger may satisfy*, NOT a global
+    truth. Asserting `∀ e1 e2 : Entry, e1.hash = e2.hash → e1 = e2` as an axiom
+    would be UNSOUND: `Entry` carries fields (contributor, timestamp, …) beyond
+    `hash`, so two entries can share a hash yet differ — that axiom would let one
+    derive `False`. Instead we make content-addressing a hypothesis a ledger
+    can be shown to meet (e.g. by deduplicating on insert). -/
+def ContentAddressed (l : Ledger) : Prop :=
+  ∀ e1 ∈ l.entries, ∀ e2 ∈ l.entries, e1.hash = e2.hash → e1 = e2
 
 /-- EMPTY LEDGER -/
 def emptyLedger : Ledger := ⟨[], 0⟩
 
 theorem empty_has_zero : emptyLedger.entries.length = 0 := rfl
+
+/-- The empty ledger is trivially content-addressed (it has no entries). -/
+theorem empty_content_addressed : ContentAddressed emptyLedger := by
+  intro e1 he1 _ _ _
+  simp [emptyLedger] at he1
 
 /-- QUALITY MONOTONE: Votes can only be added, not removed -/
 def upvote (e : Entry) : Entry :=
@@ -70,7 +83,7 @@ def upvote (e : Entry) : Entry :=
 
 theorem upvote_increases (e : Entry) :
     (upvote e).qualityVotes > e.qualityVotes := by
-  simp [upvote]; omega
+  simp only [upvote]; omega
 
 /-- MERKLE VERIFICATION: root changes with each append -/
 theorem root_changes (l : Ledger) (e : Entry) (h : e.hash > 0) :

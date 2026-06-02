@@ -31,7 +31,7 @@
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace Zoo.Main
@@ -47,8 +47,9 @@ namespace Zoo.Main
 
     All security properties hold simultaneously. -/
 theorem zoo_correctness :
-    -- 1. BFT quorum intersection (from Lux consensus)
-    (∀ n f : Nat, 3 * f < n → ∀ q1 q2 : Nat,
+    -- 1. BFT quorum intersection (from Lux consensus): at the optimal
+    --    node count n = 3f+1, two 2f+1 quorums together exceed n.
+    (∀ n f : Nat, n = 3 * f + 1 → ∀ q1 q2 : Nat,
       q1 ≥ 2 * f + 1 → q2 ≥ 2 * f + 1 → q1 + q2 > n) ∧
     -- 2. Threshold t-of-n: fewer than t parties learn nothing
     (∀ t n : Nat, t ≤ n → t ≥ 1 → n ≥ t → t - 1 < t) ∧

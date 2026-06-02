@@ -23,7 +23,7 @@
   - Epoch monotonicity: quantum height only increases
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace Protocol.Quasar
@@ -63,7 +63,7 @@ axiom bls_aggregation_sound :
 
 /-- Quantum height is monotonically increasing -/
 def addBlock (s : QuasarState) (b : QuantumBlock)
-    (h : b.height > s.quantumHeight) : QuasarState :=
+    (_h : b.height > s.quantumHeight) : QuasarState :=
   { quantumHeight := b.height
   , finalized := b :: s.finalized }
 
@@ -77,7 +77,7 @@ theorem height_monotone (s : QuasarState) (b : QuantumBlock)
     Two quorums of 2f+1 from n=3f+1 validators share f+1 members.
     At least one shared member is honest. -/
 theorem bls_quorum_intersection
-    (n f : Nat) (hf : 3 * f < n)
+    (n f : Nat) (hn : n ≤ 3 * f + 1)
     (q1 q2 : Nat)
     (hq1 : q1 ≥ 2 * f + 1) (hq2 : q2 ≥ 2 * f + 1) :
     q1 + q2 > n := by

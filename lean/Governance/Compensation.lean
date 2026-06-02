@@ -55,15 +55,20 @@ def executePayout (t : Treasury) (p : PayoutRequest) : Treasury :=
 /-- CONSERVATION: payout never exceeds treasury -/
 theorem payout_conserves (t : Treasury) (p : PayoutRequest) :
     (executePayout t p).balance ≤ t.balance := by
-  simp [executePayout, isAuthorized]
-  split <;> omega
+  unfold executePayout
+  split <;> simp
 
 /-- CONSERVATION: total assets are preserved -/
 theorem total_preserved (t : Treasury) (p : PayoutRequest) :
     (executePayout t p).balance + (executePayout t p).totalDistributed =
     t.balance + t.totalDistributed := by
-  simp [executePayout, isAuthorized]
-  split <;> omega
+  unfold executePayout
+  split
+  · next h =>
+    simp only [isAuthorized, Bool.and_eq_true, decide_eq_true_eq] at h
+    simp only []
+    omega
+  · rfl
 
 /-- THRESHOLD: insufficient approvals block payout -/
 theorem insufficient_approvals_blocked (t : Treasury) (p : PayoutRequest)
@@ -92,10 +97,12 @@ theorem zero_weight_zero_payout (totalPayout totalWeight : Nat) :
 theorem proportional_bounded (totalPayout weight totalWeight : Nat)
     (hw : weight ≤ totalWeight) :
     proportionalAmount totalPayout weight totalWeight ≤ totalPayout := by
-  simp [proportionalAmount]
+  simp only [proportionalAmount]
   split
   · omega
-  · exact Nat.div_le_of_le_mul (by omega)
+  · apply Nat.div_le_of_le_mul
+    calc totalPayout * weight ≤ totalPayout * totalWeight := Nat.mul_le_mul_left _ hw
+      _ = totalWeight * totalPayout := Nat.mul_comm _ _
 
 /-- FAIRNESS: equal weight → equal payout -/
 theorem equal_weight_equal_payout (totalPayout w totalWeight : Nat) :

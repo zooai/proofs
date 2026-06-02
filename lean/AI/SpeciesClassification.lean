@@ -59,13 +59,13 @@ def errorRate (s : ClassifierStats) : Nat :=
     bounded by the empirical error plus a complexity term. -/
 theorem pac_bound (stats : ClassifierStats)
     (empiricalError : Nat)
-    (h_emp : empiricalError = errorRate stats)
-    /-- Sample size is sufficient: n >= d (VC dimension) -/
-    (h_sufficient : stats.total ≥ stats.vcDim)
-    /-- VC dimension is positive -/
-    (h_vc : stats.vcDim > 0)
+    (_h_emp : empiricalError = errorRate stats)
+    -- Sample size is sufficient: n >= d (VC dimension)
+    (_h_sufficient : stats.total ≥ stats.vcDim)
+    -- VC dimension is positive
+    (_h_vc : stats.vcDim > 0)
     (complexityTerm : Nat)
-    /-- Complexity term scales as sqrt(d/n) (encoded as d * 10000 / n) -/
+    -- Complexity term scales as sqrt(d/n) (encoded as d * 10000 / n)
     (h_complexity : complexityTerm = stats.vcDim * 10000 / stats.total) :
     -- Generalization error is bounded by empirical error + complexity
     -- (this is the discrete encoding of the PAC-Bayes bound)
@@ -74,7 +74,7 @@ theorem pac_bound (stats : ClassifierStats)
 
 /-- As sample size grows, the complexity term shrinks. -/
 theorem pac_bound_tightens (d n₁ n₂ : Nat)
-    (h_d : d > 0) (h_n₁ : n₁ > 0) (h_n₂ : n₂ > n₁) :
+    (_h_d : d > 0) (h_n₁ : n₁ > 0) (h_n₂ : n₂ > n₁) :
     d * 10000 / n₂ ≤ d * 10000 / n₁ := by
   exact Nat.div_le_div_left (by omega) (by omega)
 
@@ -100,15 +100,15 @@ structure CertifiedPrediction where
     the smoothed classifier is certifiably robust within radius
     sigma * Phi^{-1}(p). -/
 theorem certified_radius (pred : CertifiedPrediction)
-    (h_sigma : pred.sigma > 0) :
+    (_h_sigma : pred.sigma > 0) :
     pred.confidence > 5000 := pred.hConfident
 
 /-- Higher confidence yields larger certified radius (monotonicity).
     Phi^{-1} is monotonically increasing, so higher p_A means
     larger certified radius. -/
 theorem radius_monotone_in_confidence (pred₁ pred₂ : CertifiedPrediction)
-    (h_same_sigma : pred₁.sigma = pred₂.sigma)
-    (h_higher : pred₁.confidence > pred₂.confidence)
+    (_h_same_sigma : pred₁.sigma = pred₂.sigma)
+    (_h_higher : pred₁.confidence > pred₂.confidence)
     (h_radius : pred₁.radius ≥ pred₂.radius) :
     pred₁.radius ≥ pred₂.radius := h_radius
 
@@ -148,15 +148,16 @@ def ensembleErrorBound (avgError : Nat) (size : Nat) : Nat :=
 theorem ensemble_improves (ens : Ensemble)
     (avgError : Nat)
     (h_avg : avgError > 0)
-    (h_better_than_random : avgError < 5000)  -- each model better than 50%
-    (h_independent : True)  -- independence assumption (axiomatized) :
+    (_h_better_than_random : avgError < 5000)  -- each model better than 50%
+    (_h_independent : True) :  -- independence assumption (axiomatized)
     ensembleErrorBound avgError ens.size < avgError := by
-  simp [ensembleErrorBound]
+  unfold ensembleErrorBound
+  have hs : ens.size > 0 := ens.hNonempty
   exact Nat.div_lt_self h_avg (by omega)
 
 /-- Larger ensembles have lower error bounds. -/
 theorem larger_ensemble_better (avgError : Nat) (s₁ s₂ : Nat)
-    (h : s₂ > s₁) (h_pos : avgError > 0) :
+    (h : s₂ > s₁) (_h_pos : avgError > 0) :
     ensembleErrorBound avgError s₂ ≤ ensembleErrorBound avgError s₁ := by
   simp [ensembleErrorBound]
   exact Nat.div_le_div_left (by omega) (by omega)

@@ -18,7 +18,7 @@
   - Signature size: 3309 bytes for ML-DSA-65 (security level 3)
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace Crypto.MLDSA

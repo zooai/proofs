@@ -98,47 +98,102 @@ def weightedAverage (updates : List SiteUpdate) (totalSamples : Nat) : Nat :=
   if totalSamples = 0 then 0
   else updates.foldl (fun acc u => acc + u.gradient.norm * u.numSamples) 0 / totalSamples
 
+/-- The running max-fold never decreases below its accumulator. -/
+theorem le_foldl_max (updates : List SiteUpdate) (acc : Nat) :
+    acc ≤ updates.foldl (fun acc u => max acc u.gradient.norm) acc := by
+  induction updates generalizing acc with
+  | nil => simp
+  | cons hd tl ih =>
+    simp only [List.foldl_cons]
+    exact le_trans (le_max_left acc hd.gradient.norm) (ih _)
+
+/-- The max-fold dominates the gradient norm of every site in the list. -/
+theorem norm_le_foldl_max (updates : List SiteUpdate) (acc : Nat)
+    (u : SiteUpdate) (hu : u ∈ updates) :
+    u.gradient.norm ≤ updates.foldl (fun acc u => max acc u.gradient.norm) acc := by
+  induction updates generalizing acc with
+  | nil => simp at hu
+  | cons hd tl ih =>
+    simp only [List.foldl_cons]
+    rcases List.mem_cons.mp hu with heq | hmem
+    · subst heq
+      exact le_trans (le_max_right acc u.gradient.norm) (le_foldl_max tl _)
+    · exact ih _ hmem
+
+/-- The sample-weighted sum of norms is bounded by `B · (total samples)`
+    whenever every norm is `≤ B`. Proved by threading the bound through foldl. -/
+theorem weighted_le_bound (updates : List SiteUpdate) (B : Nat)
+    (hB : ∀ u ∈ updates, u.gradient.norm ≤ B) :
+    ∀ a s, a ≤ B * s →
+      updates.foldl (fun acc u => acc + u.gradient.norm * u.numSamples) a ≤
+        B * updates.foldl (fun acc u => acc + u.numSamples) s := by
+  induction updates with
+  | nil => intro a s h; simpa using h
+  | cons hd tl ih =>
+    intro a s h
+    simp only [List.foldl_cons]
+    apply ih (fun u hu => hB u (by simp [hu]))
+    have hn : hd.gradient.norm ≤ B := hB hd (by simp)
+    have : hd.gradient.norm * hd.numSamples ≤ B * hd.numSamples :=
+      Nat.mul_le_mul_right _ hn
+    calc a + hd.gradient.norm * hd.numSamples
+        ≤ B * s + B * hd.numSamples := by omega
+      _ = B * (s + hd.numSamples) := by rw [Nat.mul_add]
+
 /-- FedAvg produces an unbiased estimator of the global gradient.
     Under the assumption that each site's gradient is an unbiased
     estimator of the local loss, the sample-weighted average is an
     unbiased estimator of the global loss gradient.
 
     E[g_fedavg] = sum_k (N_k/N) * E[g_k] = sum_k (N_k/N) * grad L_k = grad L_global
-    Axiomatized: proof requires showing the weighted sum divided by totalSamples
-    is bounded by the max gradient norm, via induction on foldl with
-    weighted arithmetic (each term ≤ max_norm * numSamples). -/
-axiom aggregation_unbiased_ax :
-  ∀ (updates : List SiteUpdate) (totalSamples : Nat),
-    totalSamples = updates.foldl (fun acc u => acc + u.numSamples) 0 →
-    totalSamples > 0 →
-    weightedAverage updates totalSamples ≤
-      updates.foldl (fun acc u => max acc u.gradient.norm) 0
-
+    Proof: the weighted sum `Σ normₖ·Nₖ ≤ M·Σ Nₖ = M·totalSamples` where `M` is the
+    max norm (each `normₖ ≤ M`); dividing by `totalSamples > 0` leaves the bound `M`. -/
 theorem aggregation_unbiased (updates : List SiteUpdate) (totalSamples : Nat)
     (h_total : totalSamples = updates.foldl (fun acc u => acc + u.numSamples) 0)
     (h_pos : totalSamples > 0)
-    /-- Each site's gradient is an unbiased estimator of the local loss gradient -/
-    (h_unbiased : ∀ u ∈ updates, u.gradient.norm > 0 → True) :
+    -- Each site's gradient is an unbiased estimator of the local loss gradient
+    (_h_unbiased : ∀ u ∈ updates, u.gradient.norm > 0 → True) :
     weightedAverage updates totalSamples ≤
-      updates.foldl (fun acc u => max acc u.gradient.norm) 0 :=
-  aggregation_unbiased_ax updates totalSamples h_total h_pos
+      updates.foldl (fun acc u => max acc u.gradient.norm) 0 := by
+  unfold weightedAverage
+  rw [if_neg (by omega)]
+  set M := updates.foldl (fun acc u => max acc u.gradient.norm) 0 with hM
+  -- weighted sum ≤ M * totalSamples (every norm ≤ M)
+  have hbound : updates.foldl (fun acc u => acc + u.gradient.norm * u.numSamples) 0 ≤
+      M * totalSamples := by
+    rw [h_total]
+    exact weighted_le_bound updates M
+      (fun u hu => norm_le_foldl_max updates 0 u hu) 0 0 (by simp)
+  -- divide both sides by totalSamples
+  calc updates.foldl (fun acc u => acc + u.gradient.norm * u.numSamples) 0 / totalSamples
+      ≤ M * totalSamples / totalSamples := Nat.div_le_div_right hbound
+    _ = M := Nat.mul_div_cancel _ h_pos
+
+/-- When every site contributes one sample, the sample-weighted fold collapses
+    to the plain sum of norms (since each `normₖ · 1 = normₖ`). -/
+theorem fold_eq_when_unit_samples (updates : List SiteUpdate) (acc : Nat)
+    (h : ∀ u ∈ updates, u.numSamples = 1) :
+    updates.foldl (fun acc u => acc + u.gradient.norm * u.numSamples) acc =
+      updates.foldl (fun acc u => acc + u.gradient.norm) acc := by
+  induction updates generalizing acc with
+  | nil => rfl
+  | cons hd tl ih =>
+    simp only [List.foldl_cons]
+    have hhd : hd.numSamples = 1 := h hd (by simp)
+    rw [hhd, Nat.mul_one]
+    exact ih _ (fun u hu => h u (by simp [hu]))
 
 /-- Aggregation with equal weights reduces to simple average.
-    Axiomatized: proof requires showing that when all numSamples = 1,
-    the weighted foldl sum(norm * 1) = sum(norm), then the division is identical. -/
-axiom equal_weight_is_mean_ax :
-  ∀ (updates : List SiteUpdate),
-    (∀ u ∈ updates, u.numSamples = 1) →
-    updates.length > 0 →
-    weightedAverage updates updates.length =
-      updates.foldl (fun acc u => acc + u.gradient.norm) 0 / updates.length
-
+    Proof: with all `numSamples = 1` the weighted fold `Σ normₖ·1` equals `Σ normₖ`,
+    and `totalSamples = length`, so the division is the plain arithmetic mean. -/
 theorem equal_weight_is_mean (updates : List SiteUpdate)
     (h_equal : ∀ u ∈ updates, u.numSamples = 1)
     (h_nonempty : updates.length > 0) :
     weightedAverage updates updates.length =
-      updates.foldl (fun acc u => acc + u.gradient.norm) 0 / updates.length :=
-  equal_weight_is_mean_ax updates h_equal h_nonempty
+      updates.foldl (fun acc u => acc + u.gradient.norm) 0 / updates.length := by
+  unfold weightedAverage
+  rw [if_neg (by omega)]
+  rw [fold_eq_when_unit_samples updates 0 h_equal]
 
 /-! ## Theorem 3: Convergence Rate -/
 
@@ -167,16 +222,16 @@ def fedStep (s : ConvergenceState) (gradNorm : Nat) : ConvergenceState :=
 /-- Loss is non-increasing across rounds (each step reduces or maintains). -/
 theorem loss_nonincreasing (s : ConvergenceState) (gradNorm : Nat) :
     (fedStep s gradNorm).loss ≤ s.loss := by
-  simp [fedStep]
-  omega
+  simp only [fedStep]
+  exact Nat.sub_le s.loss _
 
 /-- Convergence rate: after T rounds, loss gap is bounded by O(G/sqrt(T)).
     We encode this as: loss <= initialLoss * gradBound / (rounds + 1),
     which is the discrete analog of the standard O(1/sqrt(T)) rate
     accounting for data heterogeneity. -/
 theorem convergence_rate (s : ConvergenceState) (T : Nat)
-    (h_rounds : s.rounds = T)
-    (h_bounded : s.gradBound > 0)
+    (_h_rounds : s.rounds = T)
+    (_h_bounded : s.gradBound > 0)
     (h_initial : s.loss ≤ s.initialLoss) :
     -- After T rounds, loss is bounded
     s.loss ≤ s.initialLoss := h_initial
@@ -202,7 +257,7 @@ def roundEpsilon (pp : PrivacyParams) (sensitivityLevel : Nat) : Nat :=
 
     This ensures that even after T rounds of federated learning,
     the cumulative privacy loss is bounded. -/
-theorem differential_privacy (fr : FedRound) (pp : PrivacyParams)
+theorem differential_privacy (fr : FedRound) (_pp : PrivacyParams)
     (h_budget : fr.epsilonConsumed ≤ fr.epsilonBudget) :
     fr.epsilonConsumed ≤ fr.epsilonBudget := h_budget
 

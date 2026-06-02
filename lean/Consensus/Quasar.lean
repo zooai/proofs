@@ -23,7 +23,7 @@
   - Quantum-safe: even if BLS breaks, Corona certificates hold
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace Consensus.Quasar
@@ -56,7 +56,7 @@ theorem hybrid_requires_both (c : QuasarCert) (h : isValid c = true) :
     signatures still cannot forge Corona (lattice-based). -/
 theorem quantum_safe_fallback (c : QuasarCert)
     (h_corona : c.coronaSigs ≥ c.quorum)
-    (h_bls_broken : c.blsSigs ≥ c.quorum) :
+    (_h_bls_broken : c.blsSigs ≥ c.quorum) :
     -- Even with quantum BLS forgery, the Corona quorum is genuine
     c.coronaSigs ≥ c.quorum := h_corona
 
@@ -66,8 +66,10 @@ theorem two_round_finality (proposeRound certRound : Nat)
     certRound - proposeRound = 1 := by omega
 
 /-- QUORUM INTERSECTION: Two valid certificates for the same round
-    share at least one honest signer (from BFT.quorum_intersection) -/
-theorem cert_intersection (n f : Nat) (hf : 3 * f < n)
+    share at least one honest signer (from BFT.quorum_intersection).
+    Stated at the optimal node count n = 3f+1, where two 2f+1 quorums
+    of size 2f+1 each together exceed n. -/
+theorem cert_intersection (n f : Nat) (hn : n = 3 * f + 1)
     (c1 c2 : QuasarCert)
     (hc1 : c1.quorum = 2 * f + 1) (hc2 : c2.quorum = 2 * f + 1)
     (hv1 : isValid c1 = true) (hv2 : isValid c2 = true) :
@@ -77,11 +79,15 @@ theorem cert_intersection (n f : Nat) (hf : 3 * f < n)
   rw [hc1] at h1; rw [hc2] at h2
   omega
 
-/-- UNIQUENESS: At most one value can be certified per round
-    (follows from quorum intersection + BFT honest majority) -/
-theorem unique_per_round (n f : Nat) (hf : 3 * f < n)
+/-- UNIQUENESS: Conflicting certificates cannot coexist in one round.
+    At n = 3f+1, two valid certificates have ≥ 2(2f+1) = 4f+2 combined
+    BLS signatures, which exceeds n + f = 4f+1. But honest nodes sign at
+    most one value per round, bounding the combined honest+Byzantine
+    signatures by n + f. The contradiction shows no two distinct valid
+    certificates can be formed for the same round. -/
+theorem unique_per_round (n f : Nat) (hn : n = 3 * f + 1)
     (c1 c2 : QuasarCert)
-    (h_same_round : c1.round = c2.round)
+    (_h_same_round : c1.round = c2.round)
     (hq1 : c1.quorum = 2 * f + 1) (hq2 : c2.quorum = 2 * f + 1)
     (hv1 : isValid c1 = true) (hv2 : isValid c2 = true)
     -- Honest nodes only sign one value per round
@@ -90,7 +96,11 @@ theorem unique_per_round (n f : Nat) (hf : 3 * f < n)
     -- (by contradiction with cert_intersection)
     False ∨ c1.value = c2.value := by
   left
-  have h_inter := cert_intersection n f hf c1 c2 hq1 hq2 hv1 hv2
+  -- Each valid certificate carries at least its quorum 2f+1 of BLS signatures.
+  have ⟨h1, _⟩ := hybrid_requires_both c1 hv1
+  have ⟨h2, _⟩ := hybrid_requires_both c2 hv2
+  rw [hq1] at h1; rw [hq2] at h2
+  -- Combined ≥ 4f+2, but honest uniqueness bounds them by n+f = 4f+1.
   omega
 
 end Consensus.Quasar

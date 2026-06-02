@@ -19,7 +19,7 @@
   - PQ-safe: ML-DSA-65 threshold signatures
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace Bridge.Teleport
@@ -47,10 +47,13 @@ structure BridgeParams where
   validators : Nat        -- n total validators (default: 11)
   ht : threshold ≤ validators
   ht0 : threshold > 0
+  -- Quorum-intersection safety: any two t-quorums overlap (2t > n).
+  -- This is what guarantees no two conflicting teleports can be signed.
+  hquorum : 2 * threshold > validators
 
-/-- Default bridge: 7-of-11 -/
+/-- Default bridge: 7-of-11 (2·7 = 14 > 11, so quorums intersect) -/
 def defaultBridge : BridgeParams :=
-  ⟨7, 11, by omega, by omega⟩
+  ⟨7, 11, by omega, by omega, by omega⟩
 
 /-- Balance tracking per chain -/
 structure ChainBalance where
@@ -115,10 +118,10 @@ theorem finality_from_quorum (bp : BridgeParams)
     (op1 op2 : TeleportOp)
     (hv1 : op1.validatorSigs ≥ bp.threshold)
     (hv2 : op2.validatorSigs ≥ bp.threshold)
-    (h_same_nonce : op1.nonce = op2.nonce) :
+    (_h_same_nonce : op1.nonce = op2.nonce) :
     -- Two valid teleports with same nonce must agree on amount
     -- (from quorum intersection: validators won't sign conflicting ops)
     op1.validatorSigs + op2.validatorSigs > bp.validators := by
-  have := bp.ht; omega
+  have := bp.hquorum; omega
 
 end Bridge.Teleport

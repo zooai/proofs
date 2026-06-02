@@ -22,7 +22,7 @@
   - Time and random are non-reproducible
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.List.Basic
 import Mathlib.Tactic
 
@@ -89,7 +89,7 @@ theorem tensor_pure_pure (a b : Coeffects)
 theorem tensor_reproducible (a b : Coeffects)
     (ha : a.isReproducible) (hb : b.isReproducible) :
     (a ++ b).isReproducible := by
-  simp [Coeffects.isReproducible, List.all_append, Bool.and_eq_true]
+  simp only [Coeffects.isReproducible, List.all_append, Bool.and_eq_true]
   exact ⟨ha, hb⟩
 
 /-- Time is not reproducible -/

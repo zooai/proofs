@@ -173,11 +173,11 @@ theorem parallel_composition_commutative (f : Agent α β) (g : Agent α γ) (x 
 
 /-- Parallel composition preserves individual agent behavior. -/
 theorem parallel_preserves_left (f : Agent α β) (g : Agent α γ) (x : α) :
-    (parallel f g).run x |>.1 = f.run x := by
+    ((parallel f g).run x).1 = f.run x := by
   simp [parallel]
 
 theorem parallel_preserves_right (f : Agent α β) (g : Agent α γ) (x : α) :
-    (parallel f g).run x |>.2 = g.run x := by
+    ((parallel f g).run x).2 = g.run x := by
   simp [parallel]
 
 /-- Parallel with identity extracts the agent result. -/

@@ -23,7 +23,7 @@
   - Composable security: UC-framework composition theorem
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace Crypto.Threshold.Composition
@@ -67,7 +67,7 @@ theorem uniform_access_structure (p : UnifiedParams) (proto1 proto2 : Protocol) 
 
 /-- INDEPENDENCE: Key material from different protocols is distinct -/
 theorem protocol_independence (k1 k2 : KeyMaterial)
-    (h : k1.protocol ≠ k2.protocol) :
+    (_h : k1.protocol ≠ k2.protocol) :
     k1 ≠ k2 ∨ k1.shareData ≠ k2.shareData ∨ True := by
   exact Or.inr (Or.inr trivial)
 
@@ -96,8 +96,14 @@ theorem multi_keygen_uniform (p : UnifiedParams) (i j : Nat)
     sameAccessStructure
       (multiProtocolKeygen p)[i]
       (multiProtocolKeygen p)[j] := by
-  simp [multiProtocolKeygen, sameAccessStructure, List.map]
-  constructor <;> rfl
+  -- Every instance produced by the ceremony carries the same params `p`.
+  have hparams : ∀ (k : Nat) (hk : k < (multiProtocolKeygen p).length),
+      (multiProtocolKeygen p)[k].params = p := by
+    intro k hk
+    simp only [multiProtocolKeygen, List.getElem_map]
+  unfold sameAccessStructure
+  rw [hparams i hi, hparams j hj]
+  exact ⟨rfl, rfl⟩
 
 /-- Protocol ordering: LSS is the foundation, everything else builds on it -/
 def dependsOn : Protocol → Protocol → Prop

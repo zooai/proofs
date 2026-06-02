@@ -18,7 +18,7 @@
   - Threshold: t-of-n decryption with partial shares
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace Crypto.FHE.TFHE
@@ -133,7 +133,7 @@ def noiseBudget (p : Params) (ct : Ciphertext) : Nat :=
 
 /-- Bootstrapping restores noise budget -/
 theorem bootstrap_restores_budget (p : Params) (ct : Ciphertext)
-    (h : ct.valid = true) :
+    (_h : ct.valid = true) :
     noiseBudget p (bootstrap p ct) ≥ noiseBudget p (encrypt p true) := by
   simp [noiseBudget]
   have := bootstrap_resets_noise p ct
@@ -177,8 +177,8 @@ theorem int_operations_per_add : 5 * intBits = 320 := rfl  -- 320 NAND gates per
 
 /-- PARALLELISM: Independent gates can execute in parallel.
     GPU acceleration (Metal/CUDA) parallelizes across gates. -/
-theorem parallel_independent (gates : Nat) (gpuCores : Nat) (h : gpuCores > 0) :
-    gates / gpuCores + 1 ≥ 1 := by omega
+theorem parallel_independent (gates : Nat) (gpuCores : Nat) (_h : gpuCores > 0) :
+    gates / gpuCores + 1 ≥ 1 := Nat.le_add_left 1 (gates / gpuCores)
 
 /-- THRESHOLD DECRYPTION SAFETY: Fewer than t shares reveal nothing -/
 theorem threshold_privacy (shares threshold : Nat) (h : shares < threshold) :

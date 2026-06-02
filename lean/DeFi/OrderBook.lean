@@ -21,7 +21,7 @@
   Authors: Zach Kelling (Dec 2025), Woo Bin (Mar 2026)
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.List.Basic
 import Mathlib.Tactic
 

@@ -20,7 +20,7 @@
   - Robustness: t honest signers always produce valid output
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace Crypto.FROST
@@ -68,7 +68,7 @@ axiom frost_unforgeability :
 theorem threshold_exact (p : ThresholdParams)
     (signers : Nat) (h : signers ≥ p.t) :
     signers > 0 := by
-  omega
+  have := p.ht0; omega
 
 /-- t-of-n: t must be at most n -/
 theorem threshold_bounded (p : ThresholdParams) : p.t ≤ p.n := p.ht
@@ -76,14 +76,14 @@ theorem threshold_bounded (p : ThresholdParams) : p.t ≤ p.n := p.ht
 /-- Security margin: compromising t-1 is safe -/
 theorem security_margin (p : ThresholdParams) (compromised : Nat)
     (h : compromised < p.t) : compromised + 1 ≤ p.n := by
-  omega
+  have := p.ht; omega
 
 /-- Robustness: if we have n participants and at most f < n-t+1 fail,
     we still have t honest participants to sign -/
 theorem robustness (p : ThresholdParams) (failures : Nat)
     (h : failures ≤ p.n - p.t) :
     p.n - failures ≥ p.t := by
-  omega
+  have := p.ht; omega
 
 /-- Optimal threshold: t = ceil(n/2)+1 for majority threshold -/
 theorem majority_threshold_safe (n : Nat) (hn : n > 0)
@@ -95,7 +95,7 @@ theorem majority_threshold_safe (n : Nat) (hn : n > 0)
     This is a protocol property: the refreshed polynomial has the
     same constant term (same secret) but different shares. -/
 axiom share_refresh_correctness :
-  ∀ (p : ThresholdParams) (old_shares new_shares : List Share)
+  ∀ (p : ThresholdParams) (_old_shares new_shares : List Share)
     (aggPK msg : Nat),
     new_shares.length ≥ p.t →
     ∃ (sig : SchnorrSig), schnorr_verify sig aggPK msg = true

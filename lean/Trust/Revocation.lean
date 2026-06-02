@@ -16,7 +16,7 @@
   - Revoked vouches have no authority
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.List.Basic
 import Mathlib.Tactic
 
@@ -58,8 +58,8 @@ theorem empty_revokes_nothing (v : VouchRef) :
 
 /-- A valid revocation for the exact vouch works -/
 theorem valid_revocation_works (revoker revoked ts : Nat) (v : VouchRef)
-    (h_revoker : revoker == v.voucher = true)
-    (h_revoked : revoked == v.vouchee = true) :
+    (h_revoker : (revoker == v.voucher) = true)
+    (h_revoked : (revoked == v.vouchee) = true) :
     isRevoked [⟨revoker, revoked, ts, true⟩] v = true := by
   simp [isRevoked, List.any_cons, List.any_nil, h_revoker, h_revoked]
 
@@ -71,9 +71,9 @@ def validRevocations (revocations : List Revocation) : List Revocation :=
 theorem valid_filter_preserves (revocations : List Revocation) (v : VouchRef)
     (h : isRevoked revocations v = true) :
     isRevoked (validRevocations revocations) v = true := by
-  simp [isRevoked, validRevocations, List.any_eq_true, List.mem_filter] at *
+  simp only [isRevoked, validRevocations, List.any_eq_true, List.mem_filter,
+             Bool.and_eq_true] at *
   obtain ⟨r, hr_mem, hr_match⟩ := h
-  simp [Bool.and_eq_true] at hr_match
-  exact ⟨r, ⟨hr_mem, hr_match.1⟩, by simp [hr_match]⟩
+  exact ⟨r, ⟨hr_mem, hr_match.1.1⟩, hr_match⟩
 
 end Trust.Revocation

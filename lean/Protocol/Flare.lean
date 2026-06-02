@@ -17,7 +17,7 @@
   - Classification is total: exactly one of the three outcomes
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.Finset.Basic
 import Mathlib.Tactic
 
@@ -61,11 +61,11 @@ def classify (p : Params) (vc : VoteCounts) : Decision :=
     Proof: support + noSupport = total <= n.
     cert requires support >= 2f+1.
     skip requires noSupport >= 2f+1.
-    Both would require total >= 2*(2f+1) = 4f+2 > n (since n < 3f+1 < 4f+2 for f>0).
-    Actually: support + noSupport = total, and if total <= n < 3f+1,
-    then support + noSupport < 3f+1 < 2*(2f+1) = 4f+2. -/
+    Both would require total >= 2*(2f+1) = 4f+2 > n, contradicting the
+    optimal-resilience BFT bound n <= 3f+1 (since 3f+1 < 4f+2). -/
 theorem cert_skip_exclusive
     (p : Params) (vc : VoteCounts)
+    (hopt : p.n ≤ 3 * p.f + 1)
     (htotal : vc.total ≤ p.n)
     : ¬(hasCertificate p vc ∧ hasSkip p vc) := by
   intro ⟨hcert, hskip⟩
@@ -91,7 +91,11 @@ theorem classify_total (p : Params) (vc : VoteCounts) :
     classify p vc = Decision.commit ∨
     classify p vc = Decision.skip ∨
     classify p vc = Decision.undecided := by
-  simp [classify]
-  split <;> simp
+  unfold classify
+  split
+  · exact Or.inl rfl
+  · split
+    · exact Or.inr (Or.inl rfl)
+    · exact Or.inr (Or.inr rfl)
 
 end Protocol.Flare

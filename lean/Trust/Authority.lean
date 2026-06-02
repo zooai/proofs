@@ -17,7 +17,7 @@
   - Meet is greatest lower bound
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.List.Basic
 import Mathlib.Tactic
 
@@ -67,18 +67,18 @@ theorem meet_le_left (a b : Authority) : min a b ≤ a := by
 /-- Meet is a lower bound (right): a ⊓ b ≤ b -/
 theorem meet_le_right (a b : Authority) : min a b ≤ b := by
   intro c hc
-  simp [Min.min, Authority.meet, List.mem_filter, List.contains_eq_any_beq,
-        List.any_eq_true] at hc
-  obtain ⟨_, ⟨x, hxb, hcx⟩⟩ := hc
-  simp [beq_iff_eq] at hcx; rw [hcx]; exact hxb
+  simp only [Min.min, Authority.meet, List.mem_filter, List.contains_eq_any_beq,
+        List.any_eq_true, beq_iff_eq] at hc
+  obtain ⟨_, x, hxb, hcx⟩ := hc
+  rw [hcx]; exact hxb
 
 /-- Meet is greatest lower bound -/
 theorem meet_glb (a b c : Authority) (hca : c ≤ a) (hcb : c ≤ b) :
     c ≤ min a b := by
   intro cap hcap
-  simp [Min.min, Authority.meet, List.mem_filter, List.contains_eq_any_beq,
-        List.any_eq_true]
-  exact ⟨hca cap hcap, cap, hcb cap hcap, beq_self_eq_true cap⟩
+  simp only [Min.min, Authority.meet, List.mem_filter, List.contains_eq_any_beq,
+        List.any_eq_true, beq_iff_eq]
+  exact ⟨hca cap hcap, cap, hcb cap hcap, rfl⟩
 
 /-- Authority.none is the bottom element -/
 theorem none_is_bottom (a : Authority) : Authority.none ≤ a := by

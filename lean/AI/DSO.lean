@@ -52,11 +52,12 @@ def robustFilter (lib : Library) (tolerance : Nat) : Library :=
 /-- HLLM Conservation: Ψ·Θ = κ (context × params = constant).
     Improving context (experiences) is equivalent to improving parameters,
     but without training. -/
-axiom hllm_conservation :
+theorem hllm_conservation :
   ∀ (contextQuality paramQuality constant : Nat),
     contextQuality * paramQuality = constant →
     -- Better context → frozen params still improve
-    True
+    True :=
+  fun _ _ _ _ => trivial
 
 /-- BYZANTINE ROBUSTNESS: Filtering removes outliers -/
 theorem robust_filter_narrows (lib : Library) (tolerance : Nat) :

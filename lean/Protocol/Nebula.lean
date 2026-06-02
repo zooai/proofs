@@ -19,13 +19,13 @@
   - Nebula delegates invariants to Field (consistent cut property)
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.Finset.Basic
 import Mathlib.Tactic
 
 namespace Protocol.Nebula
 
-/-- Nebula is a thin wrapper around Field. Its correctness reduces to Field's. -/
+/- Nebula is a thin wrapper around Field. Its correctness reduces to Field's. -/
 
 /-- A DAG vertex -/
 structure Vertex where

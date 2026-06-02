@@ -23,7 +23,7 @@
   because that would require 2*alpha > 2*(2k/3) = 4k/3 > k total votes.
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace Consensus.BFT
@@ -42,7 +42,7 @@ theorem quorum_intersection
 /-- With n = 3f+1 nodes, honest count = 2f+1 which exceeds 2n/3. -/
 theorem honest_majority_sufficient
     (f : Nat)
-    (hf : 0 < f)
+    (_hf : 0 < f)
     : 2 * f + 1 > 2 * (3 * f + 1) / 3 := by
   omega
 
@@ -58,22 +58,26 @@ theorem unique_alpha_threshold
   omega
 
 /-- The certificate threshold (2f+1 out of n) ensures quorum intersection.
+    At the optimal node count n = 3f+1, two certificates of size 2f+1 each
+    together exceed n, so they must overlap.
     Maps to flare.go: support >= 2*p.F+1 -/
 theorem certificate_quorum_overlap
     (n f : Nat)
-    (hf : 3 * f < n)
+    (hn : n = 3 * f + 1)
     (cert1 cert2 : Nat)
     (hc1 : cert1 ≥ 2 * f + 1)
     (hc2 : cert2 ≥ 2 * f + 1)
     : cert1 + cert2 > n := by
   omega
 
-/-- Key BFT property: in a set of n nodes with f Byzantine,
+/-- Key BFT property: in a set of n = 3f+1 nodes with f Byzantine,
     any two subsets of size 2f+1 share at least one honest node.
+    Two such subsets together have 2(2f+1) = 4f+2 > n + f = 4f+1 members,
+    so their overlap exceeds the f Byzantine nodes — i.e. it is honest.
     This prevents conflicting certificates. -/
 theorem bft_intersection
     (n f : Nat)
-    (hf : 3 * f < n)
+    (hn : n = 3 * f + 1)
     : 2 * (2 * f + 1) > n + f := by
   omega
 

@@ -51,7 +51,6 @@ theorem vote_monotone_for (p : Proposal) (amount balance : Nat) :
 theorem vote_bounded_by_balance (p : Proposal) (amount balance : Nat) :
     (vote p amount balance true).votesFor ≤ p.votesFor + balance := by
   simp [vote]
-  exact Nat.min_le_right amount balance
 
 /-- QUORUM THRESHOLD: Enough votes ⟹ passes -/
 theorem sufficient_votes_pass (p : Proposal)

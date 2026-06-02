@@ -22,7 +22,7 @@
   - Composability: N chains compose safely
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Data.List.Basic
 import Mathlib.Data.Finset.Basic
 import Mathlib.Tactic
@@ -72,12 +72,12 @@ def submitAttestation (s : ProviderState) (a : ComputeAttestation) : ProviderSta
     existing compute from chain_j -/
 theorem chain_isolation (s : ProviderState) (a : ComputeAttestation) :
     (submitAttestation s a).totalCompute ≥ s.totalCompute := by
-  simp [submitAttestation]; split <;> omega
+  simp only [submitAttestation]; split <;> (try simp only []) <;> omega
 
 /-- ACCRETIVE ONLY: Rewards only increase, never decrease -/
 theorem rewards_accretive (s : ProviderState) (a : ComputeAttestation) :
     (submitAttestation s a).totalRewards ≥ s.totalRewards := by
-  simp [submitAttestation]; split <;> omega
+  simp only [submitAttestation]; split <;> (try simp only []) <;> omega
 
 /-- INVALID TEE REJECTED: Without valid TEE, state unchanged -/
 theorem invalid_tee_rejected (s : ProviderState) (a : ComputeAttestation)
@@ -98,15 +98,15 @@ theorem multi_chain_commutative (s : ProviderState)
     (a1 a2 : ComputeAttestation) :
     (submitAttestation (submitAttestation s a1) a2).totalCompute =
     (submitAttestation (submitAttestation s a2) a1).totalCompute := by
-  simp [submitAttestation]
-  split <;> split <;> omega
+  simp only [submitAttestation]
+  split <;> split <;> simp only [Nat.add_right_comm, Nat.add_assoc]
 
 /-- MONOTONE CHAIN COUNT: active chains only grows -/
 theorem chains_monotone (s : ProviderState) (a : ComputeAttestation) :
     (submitAttestation s a).activeChains.length ≥ s.activeChains.length := by
-  simp [submitAttestation]
+  simp only [submitAttestation]
   split
-  · split <;> simp [List.length_cons] <;> omega
+  · split <;> simp [List.length_cons]
   · exact Nat.le_refl _
 
 /-- ZERO COMPUTE = ZERO REWARDS -/

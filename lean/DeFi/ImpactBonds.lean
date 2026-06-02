@@ -88,19 +88,32 @@ theorem no_arbitrage (bond : Bond) (bp : BondPrice)
     bp.price = fairValue bond expectedScore bp.riskFreeRate := h_fair
 
 /-- Fair value is bounded between 0 and maxPayout.
-    Axiomatized: proof requires showing that
-    (principal + (maxPayout-principal)*score/10000) * 10000 / (10000+rate) ≤ maxPayout,
-    which needs: inner sum ≤ maxPayout (from score ≤ 10000 and Nat.div_le),
-    then discount factor ≤ 1 (from 10000/(10000+rate) ≤ 1). -/
-axiom fair_value_bounded_ax :
-  ∀ (bond : Bond) (expectedScore riskFreeRate : Nat),
-    expectedScore ≤ 10000 →
-    fairValue bond expectedScore riskFreeRate ≤ bond.maxPayout
-
+    Proof: the undiscounted expected total `principal + (maxPayout-principal)*score/10000`
+    is `≤ maxPayout` because `score ≤ 10000` makes the return term `≤ maxPayout-principal`;
+    then the discount factor `10000/(10000+rate) ≤ 1` only shrinks it further. -/
 theorem fair_value_bounded (bond : Bond) (expectedScore : Nat)
     (riskFreeRate : Nat) (h_score : expectedScore ≤ 10000) :
-    fairValue bond expectedScore riskFreeRate ≤ bond.maxPayout :=
-  fair_value_bounded_ax bond expectedScore riskFreeRate h_score
+    fairValue bond expectedScore riskFreeRate ≤ bond.maxPayout := by
+  have hge := bond.hMaxGePrincipal
+  simp only [fairValue]
+  -- Step 1: the return term is bounded by maxReturn (since expectedScore ≤ 10000).
+  set m := bond.maxPayout - bond.principal with hm
+  have h1 : m * expectedScore / 10000 ≤ m := by
+    calc m * expectedScore / 10000 ≤ m * 10000 / 10000 := by
+            apply Nat.div_le_div_right
+            exact Nat.mul_le_mul_left _ h_score
+      _ = m := by rw [Nat.mul_div_cancel _ (by norm_num : (0:Nat) < 10000)]
+  -- Hence the undiscounted total is ≤ maxPayout (using maxPayout ≥ principal).
+  have hTE : bond.principal + m * expectedScore / 10000 ≤ bond.maxPayout := by omega
+  -- Step 2: discounting by 10000/(10000+rate) ≤ 1 only shrinks the value.
+  set TE := bond.principal + m * expectedScore / 10000 with hTE2
+  calc TE * 10000 / (10000 + riskFreeRate)
+        ≤ TE * 10000 / 10000 := by
+          apply Nat.div_le_div_left
+          · omega
+          · norm_num
+    _ = TE := by rw [Nat.mul_div_cancel _ (by norm_num : (0:Nat) < 10000)]
+    _ ≤ bond.maxPayout := hTE
 
 /-- Higher expected outcome yields higher fair value. -/
 theorem fair_value_monotone_outcome (bond : Bond) (s₁ s₂ : Nat)
@@ -126,7 +139,7 @@ def computePayout (bond : Bond) : Nat :=
     function of the outcome score. Given the same bond and the same
     attested outcome, the payout is always the same. -/
 theorem payout_correct (bond : Bond) (att : OutcomeAttestation)
-    (h_match : att.bondId = bond.id)
+    (_h_match : att.bondId = bond.id)
     (h_score : bond.outcomeScore = att.score) :
     computePayout bond = bond.principal +
       (bond.maxPayout - bond.principal) * att.score / 10000 := by
@@ -140,7 +153,9 @@ theorem zero_outcome_returns_principal (bond : Bond) (h : bond.outcomeScore = 0)
 /-- Perfect outcome (10000) yields the maximum payout. -/
 theorem perfect_outcome_max_payout (bond : Bond) (h : bond.outcomeScore = 10000) :
     computePayout bond = bond.maxPayout := by
-  simp [computePayout, h]
+  have hge := bond.hMaxGePrincipal
+  simp only [computePayout, h]
+  rw [Nat.mul_div_cancel _ (by norm_num : (0:Nat) < 10000)]
   omega
 
 /-! ## Theorem 3: Principal Preservation -/
@@ -170,6 +185,5 @@ theorem early_termination_settles (bond : Bond) :
 theorem payout_at_least_principal (bond : Bond) :
     computePayout bond ≥ bond.principal := by
   simp [computePayout]
-  omega
 
 end DeFi.ImpactBonds

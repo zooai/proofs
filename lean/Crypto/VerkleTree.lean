@@ -18,7 +18,7 @@
   Author: Zach Kelling
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace Crypto.VerkleTree
@@ -31,7 +31,7 @@ structure VerkleProof where
 axiom verkle_verify : VerkleProof → Nat → Nat → Bool
 
 axiom verkle_binding :
-  ∀ (root : Nat) (key val1 val2 : Nat) (p1 p2 : VerkleProof),
+  ∀ (_root : Nat) (key val1 val2 : Nat) (p1 p2 : VerkleProof),
     verkle_verify p1 key val1 = true →
     verkle_verify p2 key val2 = true →
     val1 = val2
@@ -42,7 +42,7 @@ theorem proof_size_bounded (p : VerkleProof) :
 
 /-- VS MERKLE: Verkle proofs are smaller for large trees.
     Merkle: 32 bytes × depth. Verkle: 48 bytes × depth but depth is smaller. -/
-theorem verkle_smaller_than_merkle (n depth : Nat) (h : depth > 0) :
+theorem verkle_smaller_than_merkle (_n depth : Nat) (h : depth > 0) :
     -- Verkle tree of same capacity has smaller depth
     depth > 0 := h
 
@@ -75,6 +75,6 @@ theorem update_cost (depth : Nat) (h : depth = 4) :
 theorem multiproof_sublinear (k depth : Nat) (h : k > 1) :
     -- k individual proofs: k × depth commitments
     -- Multiproof: ≤ k × depth (often much less due to sharing)
-    k * depth ≥ depth := by omega
+    k * depth ≥ depth := Nat.le_mul_of_pos_left depth (by omega)
 
 end Crypto.VerkleTree

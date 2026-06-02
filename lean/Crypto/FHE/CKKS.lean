@@ -16,7 +16,7 @@
   - Noise budget management via rescaling
 -/
 
-import Mathlib.Data.Nat.Basic
+import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
 
 namespace Crypto.FHE.CKKS
@@ -26,7 +26,7 @@ structure Params where
   polyDegree : Nat     -- N (ring dimension)
   scaleBits : Nat      -- precision bits
   levels : Nat         -- multiplicative depth
-  hN : 0 < polyDegree
+  hN : 2 ≤ polyDegree  -- N is a power of 2, hence ≥ 2 (≥ 1 slot)
   hL : 0 < levels
 
 /-- Encrypted vector (abstract) -/
@@ -86,7 +86,8 @@ theorem transformer_layer_depth :
 def slotsPerCiphertext (p : Params) : Nat := p.polyDegree / 2
 
 theorem slots_positive (p : Params) : slotsPerCiphertext p ≥ 1 := by
-  simp [slotsPerCiphertext]; omega
+  simp only [slotsPerCiphertext, ge_iff_le, Nat.le_div_iff_mul_le (by norm_num : 0 < 2)]
+  have := p.hN; omega
 
 /-- Rescaling: after multiplication, rescale to manage noise -/
 axiom ckks_rescale : Params → CKKSCiphertext → CKKSCiphertext
@@ -97,10 +98,10 @@ axiom rescale_decreases_level :
 
 /-- ML inference: matrix multiply is add + multiply chains.
     With N slots and L levels, can process N×N matrices at depth L. -/
-theorem matmul_depth (rows cols : Nat) :
+theorem matmul_depth (rows cols : Nat) (hc : cols ≥ 1) :
     -- Matrix multiply needs log2(cols) multiplications
     -- (each multiplication consumes one level)
-    rows * cols ≥ rows := by omega
+    rows * cols ≥ rows := Nat.le_mul_of_pos_right rows hc
 
 /-- ROTATION: Rotate slots within a ciphertext (for matrix operations).
     Rotation is a key-switching operation — O(1) per rotation. -/
