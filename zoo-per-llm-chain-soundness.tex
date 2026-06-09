@@ -146,9 +146,7 @@ is bounded by $\mathsf{negl}(\lambda)$.
 \label{cor:comp}
 A contributor's compensation share, computed as the path-sum
 weight in $\mathcal{G}_M$, is a deterministic function of the
-chain. If compensation is paid via the Liquidity Protocol
-(2026-04-20 adoption, see \cite{zoo-adopts}), the payment leg is
-atomic with the attribution record.
+chain.
 \end{corollary}
 
 %% ==================================================================
@@ -312,18 +310,6 @@ $\mathrm{KernelManifest}$.
 \end{itemize}
 
 %% ==================================================================
-\section{Composition with Liquidity Protocol}
-\label{sec:lp-compose}
-%% ==================================================================
-
-Contributor compensation, when paid on-chain, is settled via the
-Liquidity Protocol post 2026-04-20 (see \cite{zoo-adopts}).
-Composition follows from the same argument as
-\cite{lux-adopts} \S4: trade atomicity composes with Block-STM
-serialisability; the per-LLM chain is itself a Block-STM-as-consensus
-chain.
-
-%% ==================================================================
 \begin{thebibliography}{9}
 
 \bibitem{quasar-cert}
@@ -334,16 +320,6 @@ Z.~Kelling.
 \bibitem{dagevm-lean}
 Lux Industries.
 \newblock \texttt{lean/Consensus/DAGEVM.lean}.
-
-\bibitem{zoo-adopts}
-Zoo Labs Foundation.
-\newblock Zoo Adopts the Liquidity Protocol.
-\newblock \texttt{zooai/proofs/zoo-adopts-liquidity-protocol.tex}, 2026-04-20.
-
-\bibitem{lux-adopts}
-Lux Industries.
-\newblock Lux Adopts the Liquidity Protocol.
-\newblock \texttt{luxfi/proofs/lux-adopts-liquidity-protocol.tex}, 2026-04-20.
 
 \bibitem{zoo-2021}
 A.~Worring, Z.~Kelling.
