@@ -1,2 +1,2 @@
-# proofs — AI Assistant Context
+# proofs
 
