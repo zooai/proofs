@@ -1,0 +1,515 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage[margin=1in]{geometry}
+
+\hypersetup{colorlinks=true,linkcolor=black,citecolor=blue,urlcolor=blue}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}{Definition}
+\newtheorem{remark}{Remark}
+\newtheorem{obligation}{Proof obligation}
+
+\newcommand{\Zoo}{\textsc{Zoo}}
+\newcommand{\F}{\mathbb{F}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\GEMM}{\mathrm{GEMM}}
+\newcommand{\reportData}{\mathsf{reportData}}
+\newcommand{\runtime}{\mathsf{runtimeMeasurement}}
+
+\title{Proof-of-Inference: Soundness, the Determinism Liveness Precondition,
+the Floating-Point No-Go, and the Routing/Chaining Extension Obligations\\
+{\large Companion soundness proofs for the Proof-of-AI execution verifier}}
+\author{Zoo Labs Foundation \\ \texttt{research@zoo.ngo}}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This note is the formal soundness companion to the Proof-of-AI execution verifier (the
+Proof-of-Inference primitive). It records, with theorems and proofs, four results. First,
+the \emph{Freivalds soundness} of the matmul verifier over an exact integer accumulator: a
+fabricated output survives a beacon-derived challenge with probability at most $1/p$ per
+vector, hence $\le 2^{-122}$ for two vectors over $\F_p$, $p = 2^{61}-1$, with \emph{zero}
+false rejection on honest re-derivation. Second, the \emph{determinism contract as the
+liveness precondition}: the soundness theorem's ``re-derive and compare'' is well-defined
+only over a runtime that produces byte-identical traces, and we state exactly which clauses
+that requires and prove that under them the honest acceptance probability is $1$. Third, a
+\emph{floating-point no-go}: naive floating-point Freivalds is simultaneously unsound (a
+tolerance band is a profitable cheating corridor) and non-live (cross-hardware
+non-associativity false-rejects honest provers), and there is no single tolerance that
+escapes both; we then prove the \emph{RepOps repair}---pinning the reduction order makes a
+floating-point GEMM a deterministic integer-mantissa computation, restoring exact Freivalds
+at a throughput cost. Fourth, the \emph{extension obligations} that carry the primitive to
+the full model zoo: the routing proof (mixture-of-experts) and the sequential-chaining proof
+(linear-recurrent/state-space models and diffusion), stated as discharge conditions with
+correctness arguments. We are explicit about which results are backed by tested code (the
+Freivalds core and the two determinism prerequisites) versus designed-only (the commitment,
+the integration, and the two extensions).
+\end{abstract}
+
+\tableofcontents
+
+\section{Model and notation}
+
+We work over the prime field $\F_p$ with the Mersenne prime $p = 2^{61}-1$. A layer's matrix
+product is $C = AB$ with $A \in \Z^{m\times k}$, $B \in \Z^{k\times n}$, $C \in \Z^{m\times
+n}$; the integer entries arise from the engine's quantized path, where i8$\times$i8 products
+accumulate into i32 \emph{without intermediate rounding}. A \emph{challenge} fixes a random
+vector $r \in \F_p^{\,n}$, derived as $r = \mathrm{PRG}(\mathsf{ch}\,\|\,\ell)$ for layer
+index $\ell$, where $\mathsf{ch}$ commits an unpredictable on-chain beacon
+($\mathsf{openBlockHash}$) so that, modeling the beacon as a random oracle, $r$ is
+independent of any value the prover committed before the beacon was known. We treat $r$ as
+uniform on $\F_p^{\,n}$ and independent of the prover's claimed output $\hat C$; this is the
+freshness property of the binding, taken as a hypothesis here (it is proved in the core
+paper's anti-replay lemma) and used as the soundness premise.
+
+The verifier evaluates the Freivalds identity
+\begin{equation}
+\label{eq:freivalds}
+A\,(B\,r) \;\overset{?}{=}\; C\,r \pmod p,
+\end{equation}
+at cost $O(mk + kn + mn)$ field operations, one order below the $O(mnk)$ recomputation.
+
+\section{Freivalds soundness over the exact integer accumulator}
+
+\begin{theorem}[One-layer soundness]
+\label{thm:one-layer}
+Let $A,B$ be the true operands and $\hat C$ the prover's claimed output, with $r \in
+\F_p^{\,n}$ uniform and independent of $\hat C$. Suppose $p$ exceeds the magnitude of every
+entry of the honest product $AB$ \textup{(}so no honest entry wraps mod $p$\textup{)}. If
+$\hat C \ne AB$ as integer matrices, then
+\[
+\Pr_r\bigl[\,\hat C\, r \equiv A(Br) \pmod p\,\bigr] \;\le\; \frac1p \;=\; 2^{-61}.
+\]
+\end{theorem}
+
+\begin{proof}
+Reduce entries mod $p$ and set $D := \hat C - AB \in \F_p^{\,m\times n}$. Because $p$ bounds
+the honest product's magnitude, an integer inequality $\hat C \ne AB$ cannot collapse to
+equality modulo $p$ by wraparound, so $D \ne 0$ over $\F_p$. The check~\eqref{eq:freivalds}
+accepts iff $\hat C r = (AB) r$, i.e.\ iff $Dr = 0$. As $D \ne 0$ it has a nonzero row
+$D_i$, and $Dr = 0$ forces $\langle D_i, r\rangle = 0$. Fix a coordinate $j$ with $D_{ij}
+\ne 0$. Conditioning on $\{r_{j'}\}_{j'\ne j}$, the linear equation $\langle D_i, r\rangle =
+0$ determines $r_j$ uniquely, $r_j = -D_{ij}^{-1}\sum_{j'\ne j} D_{ij'} r_{j'}$ (the inverse
+exists, $\F_p$ a field, $D_{ij}\ne0$). Since $r_j$ is uniform over the $p$ field elements and
+independent of the rest, it equals that one value with probability $1/p$. Hence $\Pr[Dr = 0]
+\le \Pr[\langle D_i, r\rangle = 0] = 1/p$. \qed
+\end{proof}
+
+\begin{corollary}[Zero false rejection]
+\label{cor:zero-fr}
+If $\hat C = AB$ as integer matrices, then~\eqref{eq:freivalds} holds for \emph{every} $r$.
+In particular an honest prover, and any honest re-deriving verifier on any hardware that
+computes the same integer product, passes with probability exactly $1$.
+\end{corollary}
+
+\begin{proof}
+Integer equality $\hat C = AB$ implies entrywise equality mod $p$, so $\hat C r = (AB) r =
+A(Br)$ in $\F_p$ for all $r$. The premise that the integer product is hardware-independent is
+exactly the exactness of i8$\times$i8$\to$i32 accumulation (no rounding), so two honest
+machines agree on $C$ bit-for-bit. \qed
+\end{proof}
+
+\begin{theorem}[Amplified soundness across a pass]
+\label{thm:amplified}
+Consider a forward or backward pass committing $L$ matmul layers, verified with
+$k_{\mathrm{rep}}$ independent challenge vectors per checked layer and $s$ layers sampled
+uniformly at random. Let a prover commit a trace that is not the genuine evaluation under the
+determinism contract.
+\begin{enumerate}[leftmargin=1.6em]
+\item \textup{(Dense cheat.)} If the committed matmul output is wrong on every checked layer,
+the prover passes all checks with probability at most $p^{-k_{\mathrm{rep}}} \le 2^{-61
+k_{\mathrm{rep}}}$; for $k_{\mathrm{rep}} = 2$, at most $2^{-122}$.
+\item \textup{(Sparse cheat.)} If the prover cheats on a $\rho$-fraction of layers, the cheat
+escapes sampling with probability at most $(1-\rho)^s$; conditioned on a cheated layer being
+sampled it is caught except with probability $p^{-k_{\mathrm{rep}}}$.
+\item \textup{(Output binding.)} A committed output hash inconsistent with the
+Freivalds-verified final-layer logits, under the pinned argmax/tie-break, is detected with
+certainty.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+For (1), the $k_{\mathrm{rep}}$ vectors on a discrepant checked layer are independent, so by
+Theorem~\ref{thm:one-layer} that layer passes with probability $\le (1/p)^{k_{\mathrm{rep}}}$;
+a dense cheat is discrepant on every checked layer, so the prover must survive at least one
+such check, bounded by $p^{-k_{\mathrm{rep}}}$. For (2), the $s$ sampled layers miss the
+cheated fraction with probability at most $(1-\rho)^s$ (sampling without replacement only
+lowers this); if any cheated layer is sampled, (1) applies to it. For (3), the final
+pre-softmax logits are a matmul output, hence Freivalds-checked; the verifier recomputes the
+argmax under the pinned tie-break (Section~\ref{sec:determinism}) and compares to the
+committed token---both are deterministic functions of the verified logits, so any
+inconsistency is detected with probability $1$. \qed
+\end{proof}
+
+\begin{remark}[Spot-check to certainty]
+The residual sparse-cheat term $(1-\rho)^s$ does not reach $0$ by sampling alone. An
+interactive bisection over the committed trace---$O(\log L)$ rounds isolating a single
+disputed matmul whose inputs both parties agree on, then resolved by one on-chain
+re-execution or Freivalds check---upgrades part~(2) to detection with \emph{certainty} at
+logarithmic on-chain cost. This is orthogonal to the field soundness above and is recorded in
+the core paper.
+\end{remark}
+
+\section{The determinism contract is the liveness precondition}
+\label{sec:determinism}
+
+Theorem~\ref{thm:one-layer} and Corollary~\ref{cor:zero-fr} presuppose that two honest
+evaluations agree. That is a property of the runtime, not of the algebra, and it is precisely
+the precondition that makes the verifier \emph{live} (honest provers are accepted) as opposed
+to merely \emph{sound} (cheaters are rejected). We state it as a contract and prove honest
+acceptance under it.
+
+\begin{definition}[Determinism contract]
+\label{def:contract}
+A runtime satisfies the determinism contract for a model if, digested into $\runtime$ and
+gated by governance, it fixes: (D1) \textbf{integer matmul} on the i8 (or lower) path with
+exact i32 accumulation; (D2) \textbf{temperature-$0$ argmax} decoding (no stochastic
+sampling on the proof path); (D3) a \textbf{specified tie-break}---the \emph{lowest token id}
+wins an exact-logit tie; (D4) \textbf{pinned kernels and tokenizer}, identified in $\runtime$;
+(D5) a \textbf{committed seed} for any residual stochastic op (inert on the greedy path).
+\end{definition}
+
+\begin{theorem}[Honest acceptance / liveness]
+\label{thm:liveness}
+Let two honest provers evaluate the same model on the same input under a runtime satisfying
+Definition~\ref{def:contract}. Then they produce byte-identical activation traces and the
+identical output, and each passes every Freivalds challenge with probability $1$.
+\end{theorem}
+
+\begin{proof}
+By (D1) every matmul output is an exact integer matrix, identical across hardware
+(i8$\times$i8$\to$i32 has no rounding and integer arithmetic is associative and
+machine-independent), so all committed matmul leaves agree. The non-matmul ops (normalization,
+activation, softmax) are deterministic elementwise functions of their committed (and
+agreeing) inputs under the pinned kernels (D4), so their committed leaves agree. Decoding is
+$\arg\max$ over the agreeing final logits (D2); ties---the only point of potential
+ambiguity---are resolved identically by the fixed lowest-id rule (D3); (D5) consults no RNG on
+the greedy path. By induction over the layer sequence the two traces are byte-identical and
+the output tokens coincide. Acceptance with probability $1$ is then
+Corollary~\ref{cor:zero-fr} applied at each checked layer. \qed
+\end{proof}
+
+\begin{remark}[Tested in code]
+Clauses (D1), (D3), and the routing analog of (D3) are implemented and unit-tested in the
+inference engine: the exact-integer Freivalds core (\texttt{poi.rs}, 6/6 tests), the
+lowest-token-id argmax tie-break (\texttt{sampler.rs}, replacing Rust's last-maximal
+\texttt{max\_by}), and the canonical backend-independent MoE top-$k$ (\texttt{ops.rs},
+\texttt{set\_moe\_proof\_deterministic} / \texttt{deterministic\_topk\_indices}). The trace
+commitment and the forward-pass integration that stream the leaves are designed, not yet
+built; Theorem~\ref{thm:liveness} is therefore a statement about the contract a built
+runtime must meet, two of whose three nontrivial clauses are already enforced.
+\end{remark}
+
+\section{The floating-point no-go and the RepOps repair}
+\label{sec:fp}
+
+We now prove the central negative result motivating the quantized proof-bearing mode:
+\emph{naive floating-point Freivalds cannot be both sound and live}. Then we prove the
+positive repair.
+
+\subsection{Why a floating-point GEMM is not a function of its operands}
+
+\begin{definition}[Reduction order]
+A floating-point dot product of length $k$ is computed by summing the $k$ rounded products in
+some order specified by a binary \emph{reduction tree} $\tau$ on the indices, with an IEEE
+round-to-nearest-even after each node. Two kernels may use different $\tau$ (tiling, thread
+count, FMA fusion, library version), and floating-point addition is non-associative:
+$(a+b)+c \ne a+(b+c)$ in general.
+\end{definition}
+
+\begin{proposition}[Cross-hardware divergence]
+\label{prop:divergence}
+There exist bf16 operands $A,B$ and reduction trees $\tau \ne \tau'$ such that
+$\GEMM^{\tau}(A,B) \ne \GEMM^{\tau'}(A,B)$. Consequently two honest provers using kernels with
+different reduction orders commit different outputs $C \ne C'$.
+\end{proposition}
+
+\begin{proof}
+Non-associativity of IEEE addition gives a length-$3$ witness: choose $a,b,c$ representable in
+the format with $\mathrm{fl}(\mathrm{fl}(a+b)+c) \ne \mathrm{fl}(a+\mathrm{fl}(b+c))$ (the
+standard cancellation example, where $a$ is large, $b = -a$, and $c$ is below the rounding
+unit of $a$). Embedding this triple as one row of $A$ and one column of $B$ realizes a GEMM
+entry whose value differs between the left-leaning and right-leaning trees. The two trees are
+both legitimate honest kernels, so $C \ne C'$. \qed
+\end{proof}
+
+\begin{theorem}[Floating-point no-go]
+\label{thm:no-go}
+Consider verifying a floating-point GEMM by the rule ``accept iff $\lVert C r - A(Br)
+\rVert_\infty \le \epsilon$'' for a fixed tolerance $\epsilon \ge 0$, where $C$ is the
+prover's claimed output and the verifier re-derives $A(Br)$ with its own (honest) reduction
+order. Then:
+\begin{enumerate}[leftmargin=1.6em]
+\item \textup{(Liveness requires $\epsilon$ large.)} If $\epsilon < \delta_{\mathrm{hw}}$,
+where $\delta_{\mathrm{hw}} = \max \lVert C - C'\rVert$ over honest cross-hardware reduction
+orders, then some honest prover is rejected. By Proposition~\ref{prop:divergence}
+$\delta_{\mathrm{hw}} > 0$, so $\epsilon = 0$ is not live.
+\item \textup{(Soundness requires $\epsilon$ small.)} For any $\epsilon > 0$ there is a
+cheating $\hat C \ne AB$ accepted with probability $1$ over $r$: namely any $\hat C$ with
+$\lVert (\hat C - AB) r\rVert_\infty \le \epsilon$ for the verifier's $r$. The set of such
+$\hat C$ has nonzero measure and contains points arbitrarily far from $AB$ in entries
+orthogonal to $r$.
+\item \textup{(No safe $\epsilon$.)} If the profitable-cheat margin $\delta_{\mathrm{cheat}}$
+\textup{(}the smallest $\lVert(\hat C - AB)r\rVert$ a value-skipping prover can achieve\textup{)}
+satisfies $\delta_{\mathrm{cheat}} \le \delta_{\mathrm{hw}}$, then \emph{no} $\epsilon$ is both
+live and sound.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+(1) If $\epsilon < \delta_{\mathrm{hw}}$, pick honest orders realizing $\lVert C -
+C'\rVert = \delta_{\mathrm{hw}}$ (Proposition~\ref{prop:divergence}); the prover commits $C$,
+the verifier re-derives with the order giving $C'$, and $\lVert C r - A(B r)'\rVert$ can
+exceed $\epsilon$, rejecting honest work. (2) Fix the verifier's $r$. The constraint $\lVert
+(\hat C - AB) r\rVert_\infty \le \epsilon$ is a band around the hyperplane $\{D : Dr = 0\}$ in
+the $mn$-dimensional space of discrepancy matrices $D = \hat C - AB$; it is satisfied by a
+positive-measure set, and because $r$ projects $D$ to $Dr \in \F_p^{\,m}$ ($m \ll mn$
+constraints), the band contains $D$ with arbitrarily large entries in the $(mn - m)$
+directions orthogonal to the row span of the projection. Any such $\hat C = AB + D$ is a
+genuine cheat accepted for that $r$. (3) Live demands $\epsilon \ge \delta_{\mathrm{hw}}$
+(part 1); sound demands $\epsilon < \delta_{\mathrm{cheat}}$ (else a profitable cheat lands in
+the band, part 2). If $\delta_{\mathrm{cheat}} \le \delta_{\mathrm{hw}}$ the two intervals are
+disjoint and no $\epsilon$ satisfies both. \qed
+\end{proof}
+
+\begin{remark}[Interpretation]
+The no-go is the formal content of ``do not run Freivalds on floating point.'' The corridor of
+part (2) is the cheating manifold a tolerance opens; part (1) is the false-reject the same
+tolerance is forced to admit to keep honest cross-hardware provers alive; part (3) says the
+adversary's job (make $Dr$ small) is no harder than the honest hardware's unavoidable drift,
+so the two cannot be separated by a threshold. The integer accumulator escapes the trilemma by
+making $\delta_{\mathrm{hw}} = 0$ \emph{exactly} (Corollary~\ref{cor:zero-fr}), which collapses
+the band to the point $\{Dr = 0$ with $\epsilon = 0\}$ and restores Theorem~\ref{thm:one-layer}.
+\end{remark}
+
+\subsection{The RepOps repair: pinning the reduction order}
+
+\begin{proposition}[Floating-point GEMM is exact integer-mantissa arithmetic at fixed order]
+\label{prop:repops}
+Fix an IEEE format $F$ with round-to-nearest-even and fix a reduction tree $\tau$. Then
+$\GEMM_F^{\tau}(A,B)$ is a deterministic function of $(A,B)$, computable by integer arithmetic
+on the significand/exponent fields with a deterministic rounding step at each tree node, and
+identical on every machine that honors $F$ and $\tau$.
+\end{proposition}
+
+\begin{proof}
+Each product $a_i b_j$ has significand equal to the integer product of the two integer
+significands and exponent equal to the integer sum of exponents---exact in $\Z$. A node
+combines two partial sums $u = s_u 2^{e_u}$, $v = s_v 2^{e_v}$ (integer $s$): align exponents
+by an integer shift, add significands by an integer add, apply round-to-nearest-even (a total
+function of the exact integer sum and $F$'s precision). Each operation is integer arithmetic
+plus a deterministic rounding decision, so the node output is a deterministic function of
+$(u,v)$. Induction over $\tau$ gives the claim; the disagreement of
+Proposition~\ref{prop:divergence} is exactly a difference in $\tau$, removed by fixing it. \qed
+\end{proof}
+
+\begin{theorem}[RepOps soundness]
+\label{thm:repops-sound}
+Pin $\tau$ in $\runtime$ and run the Freivalds check over the integer significand--exponent
+representation of $\GEMM_F^{\tau}(A,B)$, with $p$ chosen to bound the accumulated significand
+range. Then the check has $\delta_{\mathrm{hw}} = 0$ (zero false rejection across hardware
+honoring $F,\tau$) and per-vector soundness $\le 1/p$, i.e.\ Theorem~\ref{thm:one-layer} and
+Corollary~\ref{cor:zero-fr} hold verbatim for the floating-point tier.
+\end{theorem}
+
+\begin{proof}
+By Proposition~\ref{prop:repops} every honest machine computes the identical rounded output,
+so $\delta_{\mathrm{hw}} = 0$ and Corollary~\ref{cor:zero-fr} applies. The pinned-order output
+is an exact integer (significand $\times 2^e$) per entry; treating these integers as field
+elements mod $p$ (with $p$ bounding their magnitude), a fabricated $\hat C \ne
+\GEMM_F^{\tau}(A,B)$ gives $D \ne 0$ over $\F_p$, and Theorem~\ref{thm:one-layer}'s argument is
+unchanged. \qed
+\end{proof}
+
+\begin{remark}[Cost, and why RepOps is a tier not a default]
+Pinning $\tau$ forfeits the vendor kernel's freedom to choose the reduction order, which is the
+source of its speed; RepOps therefore runs slower than the vendor optimum (the standard
+reproducible-summation trade-off). Hence the floating-point tier offers RepOps-Freivalds
+\emph{or} a TEE/CC attestation (hardware attests the unpinned fp run, no $\tau$ pin, at the
+cost of a hardware-trust assumption), and the quantized tier---the default, and what the \Zoo{}
+zoo ships---needs neither pin nor hardware because integer accumulation is already exact.
+\end{remark}
+
+\section{Extension obligations: routing and chaining}
+\label{sec:extensions}
+
+The base primitive verifies matmuls. Two model-structural features depart from a plain GEMM
+stack, and each is discharged by one additional technique. We state each as a proof obligation
+with a correctness argument; both are designed, not yet built (the routing \emph{determinism}
+prerequisite is built and tested).
+
+\subsection{Mixture-of-experts: the routing proof}
+
+\begin{obligation}[Routing proof]
+\label{obl:routing}
+For each routed token, the prover commits (i) the router logits $g$ (a matmul output), (ii) the
+selected expert index set $S = \mathrm{top}_k(g)$ under the canonical tie-break
+\textup{(}score descending, expert-index ascending\textup{)}, and (iii) the sparse dispatch
+pattern (which tokens enter which experts). A verifier challenging the token: Freivalds-checks
+$g$; recomputes $\mathrm{top}_k(g)$ from the committed $g$ under the canonical tie-break and
+checks it equals $S$; and checks that the committed expert-FFN matmuls used exactly the experts
+in $S$ on exactly the dispatched tokens.
+\end{obligation}
+
+\begin{proposition}[Routing soundness, given Obligation~\ref{obl:routing}]
+\label{prop:routing-sound}
+Under the determinism contract extended with the canonical MoE top-$k$ (built;
+Section~\ref{sec:determinism}), a prover who routes to a cheaper or wrong expert is detected
+except with the base Freivalds error.
+\end{proposition}
+
+\begin{proof}
+A different selected expert is a different sub-network. Two disjoint cheats are possible. (a)
+\emph{Wrong indices}: the prover commits $S' \ne \mathrm{top}_k(g)$. Since $g$ is
+Freivalds-verified and the canonical tie-break is a deterministic total function of $g$
+(built), the verifier's recomputation yields $\mathrm{top}_k(g) \ne S'$ and the check fails
+with certainty. (b) \emph{Wrong matmul}: the prover commits the correct $S$ but evaluates a
+different (cheaper) expert FFN. That FFN's output is a matmul whose committed operands are the
+designated expert's weights; the Freivalds check on it catches the substitution except with
+probability $\le p^{-k_{\mathrm{rep}}}$ (Theorem~\ref{thm:one-layer}, since a different
+sub-network gives a different product). Determinism of the top-$k$ removes the false-reject
+that a non-canonical tie-break would otherwise cause for an honest prover. \qed
+\end{proof}
+
+\subsection{Linear-recurrent / SSM and diffusion: the sequential-chaining proof}
+
+\begin{obligation}[Sequential chaining]
+\label{obl:chaining}
+For a layer carrying a state $S_t = \Phi_t S_{t-1} + \Psi_t$, $o_t = \Omega_t S_t$ (the
+recurrent/SSM case) or a denoising loop with latent $z_t = f_{\theta}(z_{t-1}, t)$ (the
+diffusion case), the prover commits the ordered states $S_0,\dots,S_T$ (resp.\ latents
+$z_0,\dots,z_T$) into the trace, and the per-step check at step $t$ takes its input state from
+the committed step-$(t-1)$ output leaf. A verifier challenging step $t$ checks both the step's
+matmuls (Freivalds) and that the input state it used is byte-equal to the committed
+step-$(t-1)$ output leaf.
+\end{obligation}
+
+\begin{proposition}[Chaining soundness, given Obligation~\ref{obl:chaining}]
+\label{prop:chaining-sound}
+A prover who computes each step honestly in isolation but splices a fabricated intermediate
+state (resp.\ latent) at a step boundary is detected with certainty.
+\end{proposition}
+
+\begin{proof}
+Per-step Freivalds catches an arithmetically wrong step. The remaining cheat is a \emph{seam}
+break: step $t$ is internally consistent with respect to some $\tilde S_{t-1}$ that step
+$t-1$ did not actually produce. Obligation~\ref{obl:chaining} pins step $t$'s input to the
+committed step-$(t-1)$ output leaf, so $\tilde S_{t-1} \ne S_{t-1}^{\text{committed}}$ is a
+mismatch between the leaf step $t$ consumed and the leaf step $t-1$ produced; the verifier
+compares the two committed leaves and detects the inequality with certainty (it is an equality
+of committed bytes, not a probabilistic check). For diffusion, the additional determinism
+clauses---pinned noise schedule and sampler/seed in $\runtime$---make the trajectory a
+deterministic function of the prompt and the committed seed, so honest re-derivation of any
+challenged step reproduces the committed latent and does not false-reject. The recurrent and
+diffusion cases are identical in form (a per-step linear/parametric map plus a committed-leaf
+seam), so one technique discharges both. \qed
+\end{proof}
+
+\begin{theorem}[Whole-zoo coverage, modulo the obligations]
+\label{thm:coverage}
+With the base primitive (Theorems~\ref{thm:one-layer}, \ref{thm:amplified}) under the
+determinism contract (Theorem~\ref{thm:liveness}), the routing proof
+(Proposition~\ref{prop:routing-sound}), and the sequential-chaining proof
+(Proposition~\ref{prop:chaining-sound}), every architecture family in the \Zoo{} zoo---dense,
+mixture-of-experts, linear-recurrent/state-space, multimodal vision (a ViT tower whose
+convolution is im2col$\to$GEMM), audio (conformer GEMMs with a committed, recomputed FFT/mel
+front end), and diffusion/Transfusion---has a complete soundness account. No third core
+verification technique is required.
+\end{theorem}
+
+\begin{proof}
+Each family's heavy arithmetic is dense matmul (attention projections and MLPs; expert FFNs;
+the per-step maps $\Phi_t,\Psi_t,\Omega_t$ or the per-step denoiser; the ViT tower including
+the im2col-expressed convolution; the conformer blocks), discharged by
+Theorems~\ref{thm:one-layer}--\ref{thm:amplified} under Theorem~\ref{thm:liveness}. Sparse
+expert routing, when present, is discharged by Proposition~\ref{prop:routing-sound}; an
+inter-step state or latent seam, when present, by Proposition~\ref{prop:chaining-sound}. The
+residual per-modality operations (tokenization, image preprocessing, FFT/mel feature
+extraction, noise scheduling) are deterministic, pinned, input-independent or elementwise,
+hence committed and recomputed with zero false rejection under the determinism contract, and
+the per-modality input/output hashes bind the boundary data. Every family reduces to these
+cases plus pinned pre/post-processing, so the stated techniques suffice. \qed
+\end{proof}
+
+\section{What is proven on code versus on paper}
+
+\begin{longtable}{@{}p{6.7cm}p{2.6cm}p{4.2cm}@{}}
+\toprule
+Result & Status & Evidence \\
+\midrule
+\endhead
+Freivalds one-layer + amplified soundness (Thm.~\ref{thm:one-layer}, \ref{thm:amplified})
+  & built core, proven
+  & \texttt{poi.rs} 6/6 tests \\
+Zero false rejection on exact integers (Cor.~\ref{cor:zero-fr})
+  & built core, proven
+  & \texttt{test\_honest\_matmul\_passes} \\
+Sparse-cheat detection (Thm.~\ref{thm:amplified}.2)
+  & built core, proven
+  & \texttt{test\_larger\_random\_matmul\_catches\_sparse\_cheat} \\
+Signed-entry field reduction
+  & built core, tested
+  & \texttt{test\_negative\_entries\_field\_reduction} \\
+Deterministic challenge derivation (freshness half)
+  & built core, tested
+  & \texttt{test\_challenge\_derivation\_deterministic} \\
+Fail-closed shape contract
+  & built core, tested
+  & \texttt{test\_wrong\_dims\_rejected} \\
+Lowest-id argmax tie-break (D3)
+  & built, tested
+  & \texttt{sampler.rs} \texttt{argmax\_f32} \\
+Canonical MoE top-$k$ (routing determinism)
+  & built, tested
+  & \texttt{ops.rs} \texttt{deterministic\_topk\_indices} \\
+Determinism contract $\Rightarrow$ liveness (Thm.~\ref{thm:liveness})
+  & contract; 2/3 nontrivial clauses built
+  & D1, D3 + MoE-D3 in engine \\
+Floating-point no-go (Thm.~\ref{thm:no-go})
+  & proven (negative result)
+  & this document \\
+RepOps repair (Prop.~\ref{prop:repops}, Thm.~\ref{thm:repops-sound})
+  & designed, proven
+  & this document \\
+Routing proof soundness (Prop.~\ref{prop:routing-sound})
+  & designed, proven
+  & Obligation~\ref{obl:routing} \\
+Chaining proof soundness (Prop.~\ref{prop:chaining-sound})
+  & designed, proven
+  & Obligation~\ref{obl:chaining} \\
+Activation-trace MMR commitment + forward-pass integration
+  & designed, not built
+  & core paper \\
+\bottomrule
+\caption{Soundness results by status. ``Built'' = implemented and tested in the inference
+engine; ``designed, proven'' = formally argued here, implementation pending; ``proven
+(negative)'' = an impossibility we rely on to justify the quantized design.}
+\end{longtable}
+
+\section{Conclusion}
+
+The Proof-of-Inference primitive is sound where it is built and proven where it is designed.
+The matmul verifier catches a fabricated output with probability $\ge 1 - 1/p$ per challenge
+($\ge 1 - 2^{-122}$ at two vectors) and never false-rejects honest work, \emph{because} it runs
+over an exact integer accumulator; this is implemented and 6/6 unit-tested. The determinism
+contract is the liveness precondition that makes ``re-derive and compare'' well-defined, and
+its two nontrivial decision points---argmax ties and MoE routing ties---are pinned in code with
+canonical tie-breaks. The reason the proof-bearing mode is quantized is not preference but a
+genuine impossibility: floating-point Freivalds cannot be simultaneously sound and live, and
+the only repair (pinning the reduction order) trades exactness back in at a throughput cost.
+Finally, the full model zoo is covered by exactly two designed extensions---a routing proof for
+mixture-of-experts and a single sequential-chaining proof shared by the recurrent/state-space
+family and the diffusion loop---each proven sound modulo its discharge obligation. The honest
+remaining work is the commitment layer, the forward-pass integration, and those two extensions;
+the mathematical core they will be wired into is settled.
+
+\end{document}
