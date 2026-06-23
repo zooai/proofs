@@ -17,6 +17,7 @@ homomorphic-DAO governance.
 |---|---|---|
 | `zoo-per-llm-chain-soundness.tex` | per-LLM training chain: deterministic gradient ordering, attribution, reproducibility | paper |
 | `zoo-dao-governance-soundness.tex` | Homomorphic / holographic-consensus DAO: weighted voting, FHE-tallied secrecy, anti-Sybil | paper |
+| `thinking-chains-soundness.tex` | Thinking Chains (Proof of AI): red-team audit of Tier-0 governance contracts + issuance + visibility; on-chain invariants (cap, receipt-auth, digest domain-sep), findings, economic-security caveats | paper |
 | `lean/` | Lean 4 sources (shared with `luxfi/proofs/lean/`) | typecheck |
 
 ## Build

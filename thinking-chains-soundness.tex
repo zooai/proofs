@@ -1,0 +1,281 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage[margin=1in]{geometry}
+
+\hypersetup{colorlinks=true,linkcolor=black,citecolor=blue,urlcolor=blue}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{definition}{Definition}
+\newtheorem{remark}{Remark}
+
+\title{Thinking Chains (Proof of AI): Adversarial Soundness Review\\
+{\large Red-team audit of the Tier-0 governance contracts, the
+visibility surface, the issuance coin, and the economic-security claims}}
+\author{Zoo Labs Foundation \\ \texttt{research@zoo.ngo}}
+\date{Review date: 2026-06-22}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We record an adversarial review of the \emph{Thinking Chains} (Proof of AI)
+stack: the on-chain Tier-0 governance contracts (\texttt{ThinkingGovernor},
+\texttt{ProofOfThoughtRegistry}, \texttt{ThinkingChainObservatory},
+\texttt{GovernancePoTBridge}, \texttt{ThinkingReputation}, \texttt{L3Registry},
+\texttt{AICoin}), the off-chain operator (Go) that signs verdicts in parity with
+the Solidity contracts, the DAO visibility dashboard, the local two-chain proof
+harness, and the formal/economic claims of the two companion papers. Five
+independent adversarial reviewers attacked five disjoint surfaces. No theft,
+consensus-compromise, or cap-violation was found; the conceptual core
+(deterministic replay over authenticated artifacts; the $10^9$ capped, halving,
+provably-bounded issuance) held under analysis and fuzzing. The review did find,
+and we fixed, real integrity bugs on the \emph{visibility} layer (an
+unauthenticated receipt ledger, a deterministic-id front-run, a dashboard
+arithmetic DoS, a stored XSS, a proof harness that displayed rather than
+asserted), a cross-instance/cross-chain signature-replay gap (missing EIP-712
+domain separation), and several \emph{overstated economic-security claims} in the
+papers (a Sybil-inviting routing exponent, a quorum bound valid only for
+equal-vote committees, a reputation rule mis-described as a proper scoring rule,
+and a subsidy that did not require provable work). All contract fixes are covered
+by tests (135/135) and a live end-to-end proof (9/9 on-chain assertions); all
+paper claims are tightened or downgraded to defensible statements. This document
+is the durable record of what was attacked, what held, what changed, and the
+residual trust assumptions.
+\end{abstract}
+
+\section{Scope and method}
+
+\paragraph{System under review.} A Thinking Chain settles cognition and mints a
+coin for it. Two layers are in scope here. \textbf{Tier-0} is a set of
+EVM-agnostic Solidity contracts (the DAO governance: operator-LLM quorum decides
+on-chain knobs; a deterministic receipt ledger; a reputation EMA; the native
+coin's issuance) deployed to any EVM. \textbf{Tier-1} is the in-protocol AI
+precompile (a deterministic int8 inference path) implemented in the Rust
+revm/reth execution client; the precompile's inference correctness is out of
+scope for this review, but its determinism is the premise that makes
+``deterministic recomputation'' a valid evidence type (Section~\ref{sec:econ}).
+The off-chain operator that reads the chain and signs verdicts is Go (the Zoo-L3
+node path), and is held in byte-parity with the Solidity digest by golden
+vectors.
+
+\paragraph{Threat model.} Adversaries may: open governance thoughts with
+arbitrary parameters; bond and submit signed verdicts; call any public method
+from any address; deploy duplicate or malicious contracts; front-run; and supply
+malicious on-chain strings consumed by off-chain readers. They may not break
+secp256k1, keccak256, or the BFT consensus the chain runs under. The
+inference precompile and the engine are trusted to be deterministic where claimed.
+
+\paragraph{Method.} Five independent reviewers attacked disjoint surfaces:
+(R1) \texttt{AICoin} issuance; (R2) \texttt{ThinkingGovernor}; (R3) the
+observatory and auxiliary contracts; (R4) the papers' theorems and economic
+mechanism; (R5) the proof harness, deploy scripts, and dashboard. Each was
+required to produce concrete proof-of-concept (a failing test or explicit call
+sequence), to default to skepticism, and to state plainly what it could
+\emph{not} break. Findings below are de-duplicated and dispositioned.
+
+\section{On-chain invariants (held; now test-pinned)}
+
+The following are the load-bearing safety properties. Each was attacked and held;
+each is now pinned by a named test in the \texttt{luxdao/contracts} suite
+(135 tests green) and, where end-to-end, by the local two-chain proof
+(\texttt{beluga-l3-live.sh}, 9/9 assertions).
+
+\begin{proposition}[Issuance cap]
+For all timestamps and all sequences of \texttt{mintSubsidy} calls, cumulative
+minted subsidy never exceeds $S_{\max}=10^{9}\,\textsc{ai}$.
+\end{proposition}
+\begin{proof}[Argument]
+Minting is bounded by \texttt{emissionAllowance()} $=$
+\texttt{cumulativeAllowance()} $-$ \texttt{mintedSubsidy}. The schedule
+$\mathrm{allowed}(t)=S_{\max}\!\left(1-2^{-k}\right)+f\,S_{\max}2^{-(k+1)}$,
+$k=\lfloor t/T_h\rfloor$, $f\in[0,1)$, is continuous, strictly increasing, and
+bounded above by $S_{\max}$ (the per-epoch emissions $S_{\max}2^{-(k+1)}$ sum to
+$S_{\max}$); the floor rounding of the intra-epoch term is conservative
+(undershoots). Hence $\texttt{mintedSubsidy}\le\mathrm{allowed}(t)\le S_{\max}$.
+Verified by exact-integer modelling over $k\in[0,128]$ at one-second resolution
+and by a 2000-run sequential fuzz (\texttt{testFuzz\_SequentialCapWalk});
+over-minting by one wei reverts at every sampled timestamp.
+\end{proof}
+
+\begin{proposition}[Supply $\le$ minted; dashboard cannot underflow]
+\texttt{totalSupply} $\le$ \texttt{mintedSubsidy} always, so the observatory's
+$\texttt{burned}=\texttt{minted}-\texttt{circulating}$ is non-negative.
+\end{proposition}
+\begin{proof}[Argument]
+\texttt{mintedSubsidy} increases only inside \texttt{mintSubsidy}, by the same
+amount passed to \texttt{\_mint}; the only supply-reducer is \texttt{burn}; there
+is no other mint path (OpenZeppelin \texttt{\_mint} is internal and not
+otherwise exposed). As defence in depth against a \emph{non-canonical}
+\texttt{IAICoin} wired into the observatory, \texttt{economics()} now clamps
+$\texttt{burned}=\max(0,\texttt{minted}-\texttt{circulating})$ rather than risk an
+underflow revert that would DoS the entire dashboard.
+\end{proof}
+
+\begin{proposition}[Receipt authenticity]
+Only authorized recorders may write a Proof-of-Thought receipt; a receipt cannot
+be forged by an arbitrary caller, nor can its deterministic id be front-run to
+block or poison a legitimate governance receipt.
+\end{proposition}
+\begin{proof}[Argument]
+\texttt{register} is gated by an \texttt{isRecorder} allow-list under a DAO
+\texttt{admin}; the \texttt{GovernancePoTBridge} is the authorized recorder for
+governance receipts. Before this fix \texttt{register} was permissionless, which
+allowed (i) receipts attributing paid cognition to arbitrary payer/operator and
+inflating the dashboard's volume metric, and (ii) a front-run of the
+deterministic \texttt{receiptId} (all inputs public) that permanently blocked the
+bridge's write and injected a forged \texttt{quorumProof}. Gating writers closes
+both. Pinned by \texttt{test\_Register\_OnlyRecorder}.
+\end{proof}
+
+\begin{proposition}[Verdict signature domain separation]
+A verdict signature is valid only for the governor instance and chain it was
+produced for.
+\end{proposition}
+\begin{proof}[Argument]
+The signed digest now binds \texttt{block.chainid} and \texttt{address(this)} in
+addition to the purpose domain, task, model spec, vote, bucket, evidence, and
+operator. Without this, an operator's own re-submission of a byte-identical
+signature could manufacture a quorum on a fork, an L2, or a same-address twin
+(the prior \texttt{signer==msg.sender} check blocked third-party relay but not
+self-replay across instances). Go operator mirror and the cross-language golden
+vector were updated in lockstep (chainId $808080$, verifying contract
+\texttt{0x..beEF}); the contract layout is pinned by
+\texttt{test\_GoldenVerdictDigestParity}.
+\end{proof}
+
+\begin{remark}[Settlement robustness]
+The knob mirror to the DAO key/value singleton is now gas-capped
+(\texttt{\{gas:200{,}000\}}) so a gas-\emph{burning} (vs reverting) singleton
+cannot brick or tax \texttt{settle} via the 63/64 rule. The \texttt{L3Registry}
+gained a DAO-gated \texttt{reassign} to recover a squatted chainId and a
+zero-address guard on the authority transfer.
+\end{remark}
+
+\section{Findings and dispositions}
+
+\begin{longtable}{@{}p{1.1cm}p{8.4cm}p{4.0cm}@{}}
+\toprule
+Sev & Finding & Disposition \\
+\midrule
+\endhead
+HIGH & Permissionless \texttt{register} $\Rightarrow$ forged receipts + metric poisoning (R3 F2) & Fixed: recorder allow-list \\
+HIGH & Deterministic-\texttt{receiptId} front-run DoS + forged proof (R3 F3) & Fixed (same gate) \\
+HIGH & \texttt{L3Registry} chainId squatting bricks a real L3 (R3 F4) & Fixed: DAO \texttt{reassign} \\
+HIGH & Verdict signature replay across instances/chains (R2) & Fixed: chainId+verifyingContract \\
+HIGH & Stored XSS via on-chain \texttt{knobKey} $\to$ \texttt{innerHTML} (R5) & Fixed: HTML-escape \\
+HIGH & Proof harness displayed state but never asserted it (R5) & Fixed: 9 hard assertions, fail-closed \\
+CRIT$^\dagger$ & Routing exponent $\alpha<1$ \emph{invites} Sybil-splitting ($m^{1-\alpha}$ gain), claimed to ``blunt oligarchy'' (R4) & Fixed in paper + DAO params \\
+HIGH$^\dagger$ & \texttt{thm:quorum} Hoeffding bound false for weight-proportional committees (R4) & Restated: equal-vote regime \\
+HIGH$^\dagger$ & Subsidy mintable by a free signed artifact (no real work) (R4) & Paper: subsidy requires provable-work evidence \\
+HIGH$^\dagger$ & \texttt{lem:dissent} mis-states EMA as a proper scoring rule (R4) & Paper: slash-only claim; proper-scoring/dispute game deferred to Zoo DAO \\
+MED & \texttt{economics()} underflow DoS for a non-canonical coin (R3 F1) & Fixed: clamp \\
+MED & KVP mirror gas-grief can brick \texttt{settle} (R2) & Fixed: gas cap \\
+MED & \texttt{transferZooDAO(0)} bricks endorsement authority (R3 F5) & Fixed: zero guard \\
+MED & Cognition provenance hidden by \texttt{2>/dev/null} in the harness (R5) & Fixed: \texttt{COGNITION SOURCE} banner \\
+MED$^\dagger$ & \texttt{thm:issue} ``entire 1B minted'' overstated (supremum; integer dust) (R4) & Paper: supremum + integer note \\
+MED$^\dagger$ & \texttt{thm:pot} independence of evidence types assumed (R4) & Paper: independence hypothesis; correlated $\to\max$ \\
+LOW & \texttt{overview()} unbounded loop; gas cliff $\sim$10k tasks (R3) & Accepted; \texttt{recentThoughts} paginated; O(1) counters tracked \\
+LOW & Non-YES quorum pays committee, no opener refund (R2) & Accepted (paid for judgment, not outcome); documented \\
+LOW & \{vote,bucket\} grouping: unanimous-YES at split buckets fails to settle (R2) & Accepted; off-chain bucket coordination \\
+LOW & \texttt{ThinkingGate} binds only \texttt{taskId}, not intent (R3 F6) & Documented: consumers fix/validate \texttt{taskId} \\
+LOW & \texttt{ThinkingReputation} double-counts under a non-canonical governor (R3 F7) & Not exploitable on canonical governor; documented \\
+LOW & \texttt{esm.sh} import without SRI (R5) & Accepted; vendor/pin tracked \\
+INFO & Minter centralization bounds fair-launch to settlement+admin trust (R1) & Documented trust assumption \\
+INFO & \texttt{HALVING\_PERIOD} leap drift (1 day / 4 yr) (R1) & Cosmetic; cap unaffected \\
+\bottomrule
+\caption{Red-team findings. $^\dagger$ = paper/mechanism claim (corrected in the
+LaTeX), not an exploitable contract bug. No Critical/High contract-exploit
+(theft, consensus-break, cap-violation) was found.}
+\end{longtable}
+
+\section{Economic-security caveats (now corrected in the papers)}
+\label{sec:econ}
+
+The review's sharpest contribution was on the \emph{economic} claims, which were
+stated too strongly. The corrected, defensible positions:
+
+\begin{itemize}[leftmargin=1.4em]
+\item \textbf{Sybil-resistance is a cost, not an exponent.} A concave bond weight
+$B^\alpha$ ($\alpha<1$) is subadditive, so splitting one bond across $m$
+identities yields $m^{1-\alpha}B^\alpha>B^\alpha$: concavity \emph{rewards}
+fragmentation. Resistance must come from a per-identity registration cost and
+stake floor (splitting net-negative) and a per-identity committee-weight cap,
+specified in the Zoo DAO paper---not from the exponent.
+
+\item \textbf{Quorum capture is exponentially rare only for equal-vote
+committees.} The bound $\exp(-2n(\theta-p)^2)$ holds when each seat is one
+equal vote sampled independently of weight. Under weight-proportional sampling
+and weighted certification, a sub-threshold heavy node can capture with
+probability near $1$. Safety-critical quorums therefore certify by equal seats;
+weighted committees require a per-seat weight cap and yield a strictly weaker,
+cap-dependent guarantee.
+
+\item \textbf{Subsidy requires provable work.} A signed finite judgment is free
+to produce, so minting cannot be gated on a bare quorum signature without
+inviting work-free coinage. Subsidy minting is gated on provable-work evidence
+(deterministic recomputation of the int8 model, attestation, or zkML); quorum-only
+judgments earn demand fees but do not mint. This restores the Bitcoin-style
+cost-asymmetry (``no coin without a thought'') for cognition.
+
+\item \textbf{Reputation is coordination, not truth.} The EMA rewards agreement
+with the canonical (quorum) outcome, which is not ground truth; for subjective
+tasks it is not by itself incentive-compatible for honest minority reports. The
+``slash liars, not dissenters'' principle is sound as a \emph{confiscation}
+policy (dissent is never slashed); truth-elicitation for subjective,
+money-moving decisions uses a proper scoring rule against later-revealed outcomes
+or a bonded dispute game.
+
+\item \textbf{Issuance cap is a supremum.} $M(t)\uparrow S_{\max}$ strictly and
+never reaches $10^9$ over any finite horizon; in integer base units the schedule
+floors to zero in finite time leaving a negligible dust remainder below the cap.
+\end{itemize}
+
+What \emph{held} on the conceptual side: the determinism result
+(deterministic replay over authenticated artifacts) is sound and resolves the
+``LLMs are nondeterministic, so you cannot replay'' objection---consensus
+consumes committed artifact bytes via deterministic predicates, never a live
+generation; the recursive-upgrade-termination and training-provenance-audit
+results are correctly proven; and the single-evidence receipt-soundness bound is
+a valid restatement of the verifier's trust assumption.
+
+\section{Residual trust assumptions}
+
+\begin{enumerate}[leftmargin=1.4em]
+\item \textbf{Minter custody.} \texttt{AICoin} enforces the issuance envelope
+(cap + halving) on-chain; \emph{fairness} of distribution is delegated to the
+settlement contract authorized as minter and to the \texttt{admin} key. The cap
+bounds the blast radius of a compromised minter to no more than the honest
+schedule would have emitted.
+\item \textbf{Deterministic precompile.} ``Deterministic recomputation''
+evidence ($\eta_e=0$) is valid only for the fixed-point/int8 inference path with
+a canonical execution spec; floating-point inference on heterogeneous hardware
+must use signed-judgment or attestation evidence.
+\item \textbf{Composition.} \texttt{ThinkingChainObservatory},
+\texttt{ThinkingGate}, and \texttt{ThinkingReputation} accept arbitrary
+governor/coin implementations; their guarantees are stated against the canonical
+contracts. L3s wiring their own implementations inherit the obligation to meet
+the same invariants.
+\item \textbf{BFT and cryptography.} secp256k1, keccak256, and the underlying
+post-quantum BFT consensus are assumed unbroken.
+\end{enumerate}
+
+\section{Conclusion}
+
+The Thinking Chains spine is sound: issuance cannot exceed its cap, the receipt
+ledger is now authenticated, verdict signatures are domain-separated, and the
+deterministic-replay guarantee holds. The defects the review surfaced were
+concentrated where new surface was added---the visibility layer and the economic
+claims---and have been fixed (contracts, with tests) or tightened (papers, to
+defensible statements). The honest headline: the cryptographic and
+state-machine core is publishable as-is; the economic-security mechanism is sound
+only with the Sybil-cost, equal-vote-quorum, provable-work, and dispute-game
+provisions now made explicit. The bound that matters most---a coin is minted only
+by verifiably-performed, capped, halving cognition---survives.
+
+\end{document}
