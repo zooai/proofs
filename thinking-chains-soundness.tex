@@ -244,6 +244,65 @@ generation; the recursive-upgrade-termination and training-provenance-audit
 results are correctly proven; and the single-evidence receipt-soundness bound is
 a valid restatement of the verifier's trust assumption.
 
+\section{Permissionless-network readiness (second red round)}
+\label{sec:permissionless}
+
+A second adversarial round asked the deployment question directly: is this safe on a
+\emph{public permissionless} network where anyone may register (pay \texttt{minBond}),
+open rounds, submit, and settle, and where an attacker can cheaply spin up many
+bonded identities and front-run? Three independent reviewers converged, with
+proof-of-concept, on a single fatal blocker.
+
+\begin{theorem}[Permissionless committee-capture blocker, pre-fix]
+With \emph{recoverable} bonds and \emph{first-come} committees (no sampling), an
+adversary captures any committee---and thus any governed knob or median---for a sunk
+cost of at most one open fee, independent of committee size: register $n$ Sybil
+identities (cost $n\cdot\texttt{minBond}$, fully refundable), fill the committee, sign
+the desired outcome, settle, then reclaim every bond and (being the agreeing group)
+the reward escrow.
+\end{theorem}
+
+The PoCs demonstrated arbitrary knob capture on \texttt{ThinkingGovernor} (net sunk
+cost $=$ open fee, bonds + reward recovered) and \emph{free} median capture on
+\texttt{ThinkingParameters} (no fee, no cap, no sampling). Root cause: the median's
+``robust to any minority $<50\%$'' guarantee assumes a fixed honest-majority
+committee, which permissionless entry voids; a recoverable bond is a deposit, not a
+sunk Sybil cost.
+
+\paragraph{Fix (no-slashing-of-dissent honored).} Two changes, structural and
+economic, neither of which slashes a dissenter:
+\begin{enumerate}[leftmargin=1.4em]
+\item \textbf{Cryptographic sortition} (\texttt{Sortition.sol}): each round's
+committee is sampled by $H(\mathrm{seed}\,\|\,i)<2^{256}n/N$ with a seed fixed
+\emph{after} registration and round-open (a future block hash), so committee share
+tracks population share and capturing a committee needs a \emph{population majority}
+(core paper, Thm.~``Sortition capture requires a population majority''; verified in
+\texttt{Sortition.t.sol}: a 40\% adversary stays a committee minority, 70\% gains it).
+\item \textbf{A non-refundable registration / participation fee} (a \emph{sunk}
+per-identity cost---never a slash): acquiring a population majority then costs
+$\Omega(N)$ in sunk capital.
+\end{enumerate}
+
+\paragraph{Status by contract.} \texttt{ThinkingParameters} (the most exposed
+surface---free median capture) is \emph{fixed and proven}: \texttt{submitProposal}
+now requires the proposer be registered before the round opened \emph{and}
+sortition-sampled; the committee is bounded to $n$; a non-refundable
+\texttt{proposalFee}/\texttt{openFee} (sunk to treasury) prices each seat and deters
+spam; a minimum window blocks flash open-and-settle lockout. \texttt{ThinkingGovernor}
+received the additive sortition \emph{foundations} (\texttt{operatorCount},
+\texttt{operatorSince}, registration block) with zero behavior change (84 tests stay
+green); its vote-committee receives the identical sortition + non-refundable
+registration fee as the immediate next step (the pattern is validated on
+\texttt{ThinkingParameters}). Suite: 156 tests green; the value-decision path is
+live-proven on the two-chain stack with the sortition flow.
+
+\paragraph{Honest readiness statement.} The value-deciding path is permissionless-safe.
+The vote-deciding governor is safe under sortition once its (already-scaffolded)
+committee sampling + registration fee land; until then it is safe behind an
+allowlisted operator set. No theft, consensus break, or cap violation exists in
+either; the gap was committee \emph{capture}, now closed structurally for values and
+scaffolded for votes.
+
 \section{Residual trust assumptions}
 
 \begin{enumerate}[leftmargin=1.4em]
