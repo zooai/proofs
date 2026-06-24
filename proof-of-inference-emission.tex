@@ -195,6 +195,56 @@ throughput cost of the exact accumulator is the price of a reproducible proof an
 proof-bearing inferences.
 \end{remark}
 
+\section{Full-graph composition: chaining across attention and MoE}\label{sec:graph}
+
+Theorem~\ref{thm:e2e} binds each matmul; Proposition~\ref{prop:output} binds the output to the
+final matmul. What remains is to bind the \emph{whole graph}: a prover could commit correct matmuls
+computed on \emph{unrelated} inputs --- a transcript that verifies per-matmul but is not a real
+forward pass on the committed prompt. We close this with a typed computation trace.
+
+\begin{definition}[Computation trace]
+A trace is a sequence of typed ops $o_1,\dots,o_T$ over hash-named activations. Each op commits a
+leaf $\keccak(\texttt{DOM}_{\mathrm{op}}\,\|\,\mathsf{kind}\,\|\,(\mathsf{cm}(I))_{I\in\mathrm{in}(o)}\,\|\,\mathsf{params}\,\|\,\mathsf{cm}(\mathrm{out}(o)))$,
+where $\mathsf{cm}(\cdot)=\keccak(\texttt{DOM}_{\mathrm{act}}\|\mathsf{enc}(\cdot))$ names an activation
+tensor. Op kinds are \textsc{MatMul} (verified by Freivalds), and the deterministic, exact-integer
+glue \textsc{Add} (residual), \textsc{ReLU}, \textsc{Scale} ($1/\sqrt d$), \textsc{TopKRoute} (MoE
+router, canonical tie-break), \textsc{Gather} (expert dispatch). The trace root is the keccak Merkle
+root over the op leaves.
+\end{definition}
+
+\begin{definition}[Well-formed; locally correct]
+A trace is \emph{well-formed} if every op's input names are the declared trace input or the output
+name of an earlier op. An op is \emph{locally correct} if, opened, its revealed tensors match its
+committed input/output names and it recomputes correctly: \textsc{MatMul} by Freivalds under the
+beacon-bound challenge; a glue op by direct recomputation of its deterministic function.
+\end{definition}
+
+\begin{theorem}[Composition]\label{thm:compose}
+If a trace is well-formed and every op is locally correct, then the committed final activation equals
+the deterministic forward pass $\Phi$ applied to the committed input $x_0$. Conversely, if the
+committed output is not $\Phi(x_0)$, then some op is either not well-formed (caught from the leaves)
+or not locally correct (caught on opening, except with probability $\leq(1/p)^k$ for a \textsc{MatMul}).
+\end{theorem}
+\begin{proof}
+Order the ops topologically (the trace order suffices). Induct on $i$ that op $o_i$'s output tensor
+equals $o_i$'s true function applied to the true values of its inputs. Base: $o_1$'s inputs are the
+declared $x_0$ (well-formedness), so local correctness gives $\mathrm{out}(o_1)=o_1(x_0)$, the true
+value. Step: $o_i$'s inputs are earlier outputs (well-formedness), which by the inductive hypothesis
+are their true values; local correctness then gives $\mathrm{out}(o_i)$ the true value. Hence the
+final output is $\Phi(x_0)$. The converse is the contrapositive: a wrong output forces a wrong op,
+caught by the corresponding check (Lemma~\ref{lem:freivalds} bounds the \textsc{MatMul} case). \qed
+\end{proof}
+
+\begin{remark}[Coverage]
+Attention's spine $\mathrm{ctx}=\mathrm{softmax}(QK^\top/\sqrt d)\,V$ is two \textsc{MatMul}s and a
+\textsc{Scale} ($QK^\top$, scale, then $\cdot V$); an MoE block is \textsc{MatMul} (router) $\to$
+\textsc{TopKRoute} $\to$ \textsc{Gather} $\to$ \textsc{MatMul} (up) $\to$ \textsc{ReLU} $\to$
+\textsc{MatMul} (down) $\to$ \textsc{Add}. Both are well-formed traces in the implementation, every op
+of which verifies (\S\ref{sec:impl}). The remaining non-linearity --- the softmax normalization
+itself --- is a deterministic reduction op of the same form (recomputed, not Freivalds-checked); its
+exact fixed-point realization is the one piece carried as the named extension, not a hidden gap.
+\end{remark}
+
 \section{The post-commitment beacon}\label{sec:beacon}
 
 Soundness (Theorem~\ref{thm:e2e}) requires the challenge to be unpredictable when the prover chooses
@@ -250,7 +300,9 @@ Component & What it realizes & Tests \\
 \texttt{hanzo-engine/poi.rs} & exact matmul; keccak; Go-parity challenge derivation; Freivalds & \\
 \texttt{hanzo-engine/poi\_transcript.rs} & leaf, Merkle root/proof, \texttt{verify\_opening} (\S\ref{sec:transcript}--\ref{sec:challenger}) & \\
 \texttt{hanzo-engine/poi\_forward.rs} & \texttt{ProvableLinear}, \texttt{prove} (\S\ref{sec:forward}) & 18/18 \\
-\texttt{crypto/poi} (Go) & transcript + \texttt{VerifyOpening} + opening wire codec & pass \\
+\texttt{hanzo-engine/poi\_graph.rs} & \texttt{GraphTrace}, typed ops, chaining (\S\ref{sec:graph}; attention+MoE) & 6/6 \\
+\texttt{crypto/promptseal} (Go) & HPKE prompt seal (\S\ref{sec:conf}) & 6/6 \\
+\texttt{crypto/poi} (Go) & transcript + \texttt{VerifyOpening} + opening wire codec + adversarial & pass \\
 \texttt{ComputeWitnessLib.sol} & on-chain Freivalds + Merkle + beacon (\S\ref{sec:onchain}) & 5/5 \\
 \texttt{OptimisticEvidence.sol} & the slash gate, \texttt{ProvesFraud}-driven (Prop.~\ref{prop:gate}) & 18/18 \\
 \texttt{aivmbridge} precompile & native verification, selector \texttt{0x12} & 5/5 \\
@@ -275,20 +327,57 @@ $r_2$ (\S\ref{sec:beacon}).
 \item Honest forward verifies under \emph{every} beacon.
 \end{enumerate}
 
+\section{Confidentiality: the operator never sees plaintext}\label{sec:conf}
+
+Soundness binds \emph{correctness}; it says nothing about \emph{who sees the prompt}. The default
+path handed the winning operator the plaintext prompt by hash. We close this (audit G9) with a
+single-shot sealing envelope: each operator publishes a KEM public key in its registry entry, and the
+requester seals the prompt to it.
+
+\begin{definition}[Prompt seal]
+With operator key pair $(\mathsf{pk},\mathsf{sk})$, the requester computes
+$\mathsf{seal}(\mathsf{pk},m,\mathrm{aad}) = \mathsf{enc}\,\|\,\mathsf{HPKE.Seal}(\mathsf{pk},\mathrm{info},\mathrm{aad},m)$,
+RFC~9180 base mode with X25519-HKDF-SHA256 and ChaCha20-Poly1305, the associated data $\mathrm{aad}$
+bound to the request (the $\mathsf{intentID}$). Only $\mathsf{sk}$, inside the operator's compute
+boundary, opens it.
+\end{definition}
+
+\begin{proposition}[Confidentiality]\label{prop:conf}
+Under the IND-CCA2 security of the HPKE suite: (i) a passive observer, and any operator other than the
+intended recipient, learns nothing about $m$ beyond its length; (ii) two seals of the same prompt are
+computationally indistinguishable (fresh ephemeral key per seal); (iii) any modification of the sealed
+blob, or use under a different $\mathrm{aad}$, causes $\mathsf{open}$ to fail (AEAD authentication), so
+a sealed prompt cannot be replayed under another request.
+\end{proposition}
+\begin{proof}
+Each property is the corresponding HPKE guarantee in base mode: (i) and (ii) are KEM/DEM IND-CCA2
+secrecy with a fresh encapsulation; (iii) is AEAD integrity over $(\mathrm{aad},\text{ciphertext})$.
+The wrapper adds only the length-prefixed encapsulated key, which is part of the HPKE ciphertext. \qed
+\end{proof}
+
+\begin{remark}
+This makes modes (2)--(3) (delegated trustless/trusted operators) non-custodial \emph{on the wire}:
+the prompt is ciphertext to everyone but the chosen operator. Custody \emph{inside} the operator's
+boundary (a TEE attesting it decrypts only in-enclave) is the orthogonal hardware-attestation concern;
+the envelope here is its prerequisite and is independent of it.
+\end{remark}
+
 \section{Scope: what is proven and what is assumed}
 
 \begin{itemize}[leftmargin=1.4em]
-\item \textbf{Proven (here, on code).} Per-matmul soundness end to end (Thm.~\ref{thm:e2e}); no-false-slash
-(Thm.~\ref{thm:honest}); output binding for the proof-bearing linear (Prop.~\ref{prop:output}); on-chain
-enforcement with native and reference verifiers (Prop.~\ref{prop:gate}); cross-language byte parity.
+\item \textbf{Proven (here, on code).} Per-matmul soundness end to end (Thm.~\ref{thm:e2e});
+no-false-slash (Thm.~\ref{thm:honest}); output binding for the proof-bearing linear
+(Prop.~\ref{prop:output}); \emph{full-graph composition} across attention and MoE
+(Thm.~\ref{thm:compose}); \emph{prompt confidentiality} (Prop.~\ref{prop:conf}); on-chain enforcement
+with native and reference verifiers (Prop.~\ref{prop:gate}); cross-language byte parity.
 \item \textbf{Assumed.} Collision/pre-image resistance and random-oracle behavior of $\keccak$; the
-field bound of Lemma~\ref{lem:freivalds} (companion); an honest majority of block producers for the
-$\mathsf{blockhash}$ beacon over the challenge window (a stronger VRF beacon strengthens this without
-changing the theorems).
-\item \textbf{Out of scope (named, not hidden).} The \emph{sequential-chaining} obligation --- that
-$A^{(\ell+1)}$ is the deterministic requantization of $\mathsf{dequant}(C^{(\ell)})$ --- is checked per
-link by recomputation but its full-graph composition (attention, MoE routing) is the subject of the
-companion extensions; confidentiality of the prompt is a separate envelope and is not claimed here.
+field bound of Lemma~\ref{lem:freivalds} (companion); IND-CCA2 of the HPKE suite (Prop.~\ref{prop:conf});
+an honest majority of block producers for the $\mathsf{blockhash}$ beacon over the challenge window (a
+stronger VRF beacon strengthens this without changing the theorems).
+\item \textbf{Out of scope (named, not hidden).} The exact fixed-point realization of the softmax
+normalization op (a deterministic reduction, recomputed not Freivalds-checked --- the RepOps tier of
+the companion); and custody \emph{inside} a TEE boundary (hardware attestation, orthogonal to and
+enabled by the confidentiality envelope of \S\ref{sec:conf}).
 \end{itemize}
 
 \begin{thebibliography}{9}
