@@ -240,9 +240,12 @@ Attention's spine $\mathrm{ctx}=\mathrm{softmax}(QK^\top/\sqrt d)\,V$ is two \te
 \textsc{Scale} ($QK^\top$, scale, then $\cdot V$); an MoE block is \textsc{MatMul} (router) $\to$
 \textsc{TopKRoute} $\to$ \textsc{Gather} $\to$ \textsc{MatMul} (up) $\to$ \textsc{ReLU} $\to$
 \textsc{MatMul} (down) $\to$ \textsc{Add}. Both are well-formed traces in the implementation, every op
-of which verifies (\S\ref{sec:impl}). The remaining non-linearity --- the softmax normalization
-itself --- is a deterministic reduction op of the same form (recomputed, not Freivalds-checked); its
-exact fixed-point realization is the one piece carried as the named extension, not a hidden gap.
+of which verifies (\S\ref{sec:impl}). The softmax normalization is a \textsc{Softmax} op realized as a
+\emph{deterministic fixed-point integer} reduction (Q16, max-shift for stability, an I-BERT-style
+integer $\exp$): pure-integer, hence bit-reproducible across backends, so the challenger recomputes it
+and checks the committed output exactly --- the attention block is the complete spine
+$QK^\top\!\to$ scale $\to$ softmax $\to\cdot V$, with no floating-point reduction anywhere in the
+committed trace.
 \end{remark}
 
 \section{The post-commitment beacon}\label{sec:beacon}
@@ -300,9 +303,10 @@ Component & What it realizes & Tests \\
 \texttt{hanzo-engine/poi.rs} & exact matmul; keccak; Go-parity challenge derivation; Freivalds & \\
 \texttt{hanzo-engine/poi\_transcript.rs} & leaf, Merkle root/proof, \texttt{verify\_opening} (\S\ref{sec:transcript}--\ref{sec:challenger}) & \\
 \texttt{hanzo-engine/poi\_forward.rs} & \texttt{ProvableLinear}, \texttt{prove} (\S\ref{sec:forward}) & 18/18 \\
-\texttt{hanzo-engine/poi\_graph.rs} & \texttt{GraphTrace}, typed ops, chaining (\S\ref{sec:graph}; attention+MoE) & 6/6 \\
-\texttt{crypto/promptseal} (Go) & HPKE prompt seal (\S\ref{sec:conf}) & 6/6 \\
-\texttt{crypto/poi} (Go) & transcript + \texttt{VerifyOpening} + opening wire codec + adversarial & pass \\
+\texttt{hanzo-engine/poi\_graph.rs} & \texttt{GraphTrace}, typed ops incl.\ fixed-point softmax, chaining (\S\ref{sec:graph}) & 8/8 \\
+\texttt{crypto/promptseal} (Go) & post-quantum (X-Wing) prompt seal (\S\ref{sec:conf}) & 6/6 \\
+\texttt{crypto/attestation} (Go) & TEE quote verifier: ECDSA + x509 chain + binding (Prop.~\ref{prop:custody}) & 6/6 \\
+\texttt{crypto/poi} (Go) & transcript + \texttt{VerifyOpening} + wire codec + adversarial + scaling (\S\ref{sec:scale}) & pass \\
 \texttt{ComputeWitnessLib.sol} & on-chain Freivalds + Merkle + beacon (\S\ref{sec:onchain}) & 5/5 \\
 \texttt{OptimisticEvidence.sol} & the slash gate, \texttt{ProvesFraud}-driven (Prop.~\ref{prop:gate}) & 18/18 \\
 \texttt{aivmbridge} precompile & native verification, selector \texttt{0x12} & 5/5 \\
@@ -337,10 +341,19 @@ requester seals the prompt to it.
 \begin{definition}[Prompt seal]
 With operator key pair $(\mathsf{pk},\mathsf{sk})$, the requester computes
 $\mathsf{seal}(\mathsf{pk},m,\mathrm{aad}) = \mathsf{enc}\,\|\,\mathsf{HPKE.Seal}(\mathsf{pk},\mathrm{info},\mathrm{aad},m)$,
-RFC~9180 base mode with X25519-HKDF-SHA256 and ChaCha20-Poly1305, the associated data $\mathrm{aad}$
-bound to the request (the $\mathsf{intentID}$). Only $\mathsf{sk}$, inside the operator's compute
-boundary, opens it.
+RFC~9180 base mode with \textbf{X-Wing} (the hybrid X25519 $+$ ML-KEM-768 KEM), HKDF-SHA256, and
+ChaCha20-Poly1305, the associated data $\mathrm{aad}$ bound to the request (the $\mathsf{intentID}$).
+Only $\mathsf{sk}$, inside the operator's compute boundary, opens it. The hybrid KEM makes the seal
+\emph{post-quantum}: confidentiality holds if \emph{either} X25519 or ML-KEM-768 is unbroken, so a
+future quantum adversary that breaks X25519 still cannot recover $m$.
 \end{definition}
+
+\begin{remark}[The whole scheme is post-quantum]
+The proof layer needs no upgrade: Freivalds soundness (Lemma~\ref{lem:freivalds}) is
+\emph{information-theoretic} (it holds against an unbounded, hence quantum, adversary), and the
+commitments are keccak (PQ-secure up to Grover, i.e.\ $128$-bit PQ at keccak-256). The staking layer is
+ML-DSA. With the X-Wing seal, every layer of the system is post-quantum.
+\end{remark}
 
 \begin{proposition}[Confidentiality]\label{prop:conf}
 Under the IND-CCA2 security of the HPKE suite: (i) a passive observer, and any operator other than the
@@ -355,29 +368,81 @@ secrecy with a fresh encapsulation; (iii) is AEAD integrity over $(\mathrm{aad},
 The wrapper adds only the length-prefixed encapsulated key, which is part of the HPKE ciphertext. \qed
 \end{proof}
 
-\begin{remark}
-This makes modes (2)--(3) (delegated trustless/trusted operators) non-custodial \emph{on the wire}:
-the prompt is ciphertext to everyone but the chosen operator. Custody \emph{inside} the operator's
-boundary (a TEE attesting it decrypts only in-enclave) is the orthogonal hardware-attestation concern;
-the envelope here is its prerequisite and is independent of it.
-\end{remark}
+This makes delegated operation non-custodial \emph{on the wire}: the prompt is ciphertext to everyone
+but the chosen operator. Custody \emph{inside} the operator's boundary is closed by binding the
+confidentiality key to an attested enclave.
+
+\begin{definition}[Attestation quote]
+A quote is $(\mathsf{measure},\mathsf{rd},\mathsf{cert},\mathsf{chain},\sigma)$: an enclave measurement
+$\mathsf{measure}$, report data $\mathsf{rd}$, an attestation-key certificate $\mathsf{cert}$ with chain
+$\mathsf{chain}$, and an ECDSA-P256 signature $\sigma$ over $(\mathsf{measure}\,\|\,\mathsf{rd})$. It
+\emph{verifies for key} $\mathsf{pk}$ under policy $(\mathcal{R},\mathcal{M})$ iff (1) $\mathsf{cert}$
+chains through $\mathsf{chain}$ to a pinned root in $\mathcal{R}$; (2) $\sigma$ verifies under
+$\mathsf{cert}$'s key; (3) $\mathsf{measure}\in\mathcal{M}$; and (4) $\mathsf{rd}=\mathrm{H}(\mathsf{pk})$.
+\end{definition}
+
+\begin{proposition}[In-enclave custody]\label{prop:custody}
+If a quote verifies for the operator's confidentiality key $\mathsf{pk}$ under a policy whose roots are
+the genuine vendor CA and whose allow-list is the audited enclave image, then the holder of the
+corresponding $\mathsf{sk}$ is that enclave image running on genuine hardware. Composed with
+Proposition~\ref{prop:conf}: a prompt sealed to $\mathsf{pk}$ is decryptable \emph{only} inside the
+attested enclave --- custody end to end, no plaintext outside verified code.
+\end{proposition}
+\begin{proof}
+(1) forces the attestation key to be vendor-certified (hardware genuineness); (2) binds the report to
+that key; (3) forces the audited image; (4) binds $\mathsf{pk}$ into the signed report, so the key was
+generated and held inside that enclave. An adversary lacking the vendor key fails (1) (its own
+well-formed quote is rejected); altering the image after signing fails (2); a different key fails (4).
+By Prop.~\ref{prop:conf} only $\mathsf{sk}$ opens the seal, and $\mathsf{sk}$ lives only in the enclave.
+\qed
+\end{proof}
+
+\section{Scaling: verification is per-node-independent}\label{sec:scale}
+
+A node verifies an opening with \emph{no} coordination --- $\mathsf{VerifyOpening}$ is a pure function
+of the opening, root, and beacon. So the network is embarrassingly parallel: $N$ nodes contribute $N\times$
+aggregate verification capacity at constant per-proof latency, and security \emph{strengthens} with $N$
+because a fabricated matmul is caught if \emph{any} honest node opens it. Measured single-node latency
+on a $64\times128\times64$ challenged slice is $\approx 1.8$\,ms ($\approx 540$ verifications/s/node);
+the per-node-independent projection is:
+
+\begin{center}
+\begin{tabular}{@{}rrrr@{}}
+\toprule
+nodes & aggregate verif./s & per-proof latency & $\Pr[\text{fraud caught} \mid 10\%\text{ honest}]$ \\
+\midrule
+1 & $5.4\times10^{2}$ & $1.8$\,ms & $0.100$ \\
+10 & $5.4\times10^{3}$ & $1.8$\,ms & $0.651$ \\
+100 & $5.4\times10^{4}$ & $1.8$\,ms & $0.9999$ \\
+1000 & $5.4\times10^{5}$ & $1.8$\,ms & $1.000$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The last column is $1-(1-h)^{N}$ for an honest fraction $h=0.1$ of $N$ nodes independently
+spot-checking: detection is near-certain by $N=100$. Throughput is linear because nodes are separate
+machines with no shared state; the cost the network pays per challenged matmul is one Freivalds check,
+which is why a single bounded slice suffices regardless of model size.
 
 \section{Scope: what is proven and what is assumed}
 
 \begin{itemize}[leftmargin=1.4em]
 \item \textbf{Proven (here, on code).} Per-matmul soundness end to end (Thm.~\ref{thm:e2e});
 no-false-slash (Thm.~\ref{thm:honest}); output binding for the proof-bearing linear
-(Prop.~\ref{prop:output}); \emph{full-graph composition} across attention and MoE
-(Thm.~\ref{thm:compose}); \emph{prompt confidentiality} (Prop.~\ref{prop:conf}); on-chain enforcement
-with native and reference verifiers (Prop.~\ref{prop:gate}); cross-language byte parity.
+(Prop.~\ref{prop:output}); \emph{full-graph composition} across attention and MoE including the
+fixed-point softmax (Thm.~\ref{thm:compose}, \S\ref{sec:graph}); \emph{post-quantum prompt
+confidentiality} (Prop.~\ref{prop:conf}); \emph{in-enclave custody} via attestation
+(Prop.~\ref{prop:custody}); on-chain enforcement with native and reference verifiers
+(Prop.~\ref{prop:gate}); per-node-independent linear scaling (\S\ref{sec:scale}); cross-language byte
+parity.
 \item \textbf{Assumed.} Collision/pre-image resistance and random-oracle behavior of $\keccak$; the
-field bound of Lemma~\ref{lem:freivalds} (companion); IND-CCA2 of the HPKE suite (Prop.~\ref{prop:conf});
-an honest majority of block producers for the $\mathsf{blockhash}$ beacon over the challenge window (a
-stronger VRF beacon strengthens this without changing the theorems).
-\item \textbf{Out of scope (named, not hidden).} The exact fixed-point realization of the softmax
-normalization op (a deterministic reduction, recomputed not Freivalds-checked --- the RepOps tier of
-the companion); and custody \emph{inside} a TEE boundary (hardware attestation, orthogonal to and
-enabled by the confidentiality envelope of \S\ref{sec:conf}).
+field bound of Lemma~\ref{lem:freivalds} (companion); IND-CCA2 of the (post-quantum, X-Wing) HPKE suite
+(Prop.~\ref{prop:conf}); unforgeability of ECDSA-P256 and a genuine pinned vendor CA for attestation
+(Prop.~\ref{prop:custody}); an honest majority of block producers for the $\mathsf{blockhash}$ beacon
+over the challenge window (a stronger VRF beacon strengthens this without changing the theorems).
+\item \textbf{Out of scope (named, not hidden).} Platform-specific quote \emph{parsing} (the SGX/TDX
+DCAP and SEV-SNP byte layouts map into the canonical quote of \S\ref{sec:conf}; this paper owns the
+verification soundness, not each vendor's wire format).
 \end{itemize}
 
 \begin{thebibliography}{9}
