@@ -1,0 +1,299 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage[margin=1in]{geometry}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}{Definition}
+\newtheorem{remark}{Remark}
+\newtheorem{obligation}{Proof obligation}
+
+\newcommand{\Fp}{\mathbb{F}_p}
+\newcommand{\keccak}{\mathsf{keccak}}
+\newcommand{\bydef}{\triangleq}
+
+\title{Proof-of-Inference: End-to-End Emission and On-Chain Enforcement\\
+\large The activation-trace commitment that makes ``no real compute, no mint'' a theorem, not a hope}
+\author{Zoo Labs Foundation \\ Hanzo AI \\ Lux Network}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+A companion proof established that the Freivalds matrix-product verifier over $\Fp$, $p=2^{61}-1$,
+catches a fabricated product $C\neq A\cdot B$ with probability $\geq 1-1/p$ per challenge vector,
+with \emph{zero} false rejection over an exact integer accumulator. That primitive was correct but
+\emph{unwired}: nothing fed it operands from a real forward pass, so an adversary could mint by
+committing to an output it never computed. This paper closes that gap. We define an
+\emph{activation-trace transcript} --- a keccak Merkle commitment over the exact-integer operands of
+each proof-bearing matmul of a forward pass --- and a permissionless \emph{challenger} that opens a
+beacon-selected matmul and Freivalds-checks it. We prove (Theorem~\ref{thm:e2e}) that a prover who
+returns any output not produced by the committed computation is caught except with probability
+$\leq (1/p)^k$, and that an honest prover is \emph{never} slashable (Theorem~\ref{thm:honest}). We
+give a proof-bearing forward (the \texttt{ProvableLinear} layer) whose returned value \emph{is} the
+committed exact-integer result, eliminating the float-shadow unsoundness; an on-chain witness
+(\texttt{ComputeWitnessLib}) and a native precompile (\texttt{aivmbridge} selector
+\texttt{0x12000000}) that run the check in the EVM with no off-chain trust; and a slash gate
+(\texttt{OptimisticEvidence}) that pays a bond to a challenger \emph{only} on a verified fraud. Every
+result is implemented and tested across four languages (Rust prover, Go verifier, Solidity contract,
+Go precompile) with byte-identical commitments and a pinned cross-language challenge vector;
+\S\ref{sec:impl} tabulates the suite, including an adversarial red-team battery that exercises each
+attack the theorems forbid.
+\end{abstract}
+
+\section{Setting and the gap this closes}
+
+An LLM forward pass is, to $\sim$95\% of its arithmetic, a sequence of matrix multiplications
+$C^{(\ell)} = A^{(\ell)} B^{(\ell)}$, $\ell = 1,\dots,L$. Proof-of-Inference binds a coin reward to
+having \emph{performed} that arithmetic. The verifier is Freivalds' check~\cite{freivalds}: for a
+random $r$, test $A(Br)\stackrel{?}{=}Cr$ over $\Fp$ in $O(tk+kn+tn)$ --- an order cheaper than
+recomputing $C$ --- catching $C\neq AB$ with probability $\geq 1-1/p$.
+
+We work over the Mersenne prime $p = 2^{61}-1$ on the \emph{exact integer accumulator} of the int8
+matmul path ($i8\times i8 \to i64$, whole-$K$, no cross-block float reduction). Integer arithmetic is
+bit-identical across CPU/GPU/backends, giving zero false rejection. The companion paper proves the
+single-product soundness; we take it as Lemma~\ref{lem:freivalds} and build the system that feeds it.
+
+\begin{lemma}[Single-product soundness, companion]\label{lem:freivalds}
+For integer matrices $A\in\mathbb{Z}^{t\times k}, B\in\mathbb{Z}^{k\times n}, C\in\mathbb{Z}^{t\times n}$
+reduced into $\Fp$ entrywise, and $k$ challenge vectors $r_1,\dots,r_k$ drawn uniformly and
+independently from $\Fp^{\,n}$: if $C = AB$ then $A(Br_j)=Cr_j$ for all $j$ (zero false reject); if
+$C\neq AB$ then $\Pr[\,\forall j:\, A(Br_j)=Cr_j\,] \leq (1/p)^k$.
+\end{lemma}
+
+\paragraph{The gap.} Lemma~\ref{lem:freivalds} is about \emph{operands}. The unsoundness the audit
+found was that nothing in the deployed system ever produced operands from a real model: the verifier
+had zero callers, and the mint gate accepted any non-empty ``witness''. So a prover committed an
+output hash with no computation behind it and minted. Everything below is the missing wire.
+
+\section{The activation-trace transcript}\label{sec:transcript}
+
+\begin{definition}[Matmul leaf]
+For a matmul with exact integer operands $(A,B,C)$, its leaf is
+\[
+\mathsf{leaf}(A,B,C) \bydef \keccak\big(\,\texttt{DOM} \,\|\, \mathsf{enc}(A) \,\|\, \mathsf{enc}(B) \,\|\, \mathsf{enc}(C)\,\big),
+\]
+where $\mathsf{enc}(M) = \mathrm{BE}_{32}(\text{rows})\,\|\,\mathrm{BE}_{32}(\text{cols})\,\|\,\big(\mathrm{BE}_{64}(M_{ij})\big)_{ij}$ is the
+canonical row-major serialization and $\texttt{DOM}=\texttt{``hanzo/poi/matmul-leaf/v1''}$.
+\end{definition}
+
+\begin{definition}[Transcript and root]
+A forward pass commits its proof-bearing matmuls $(A^{(\ell)},B^{(\ell)},C^{(\ell)})_{\ell=1}^{L}$ as
+the leaf vector $(\mathsf{leaf}_\ell)_{\ell}$. The \emph{transcript root} $\rho$ is the keccak binary
+Merkle root over those leaves (odd levels duplicate the last node; the index fold is
+$\mathsf{even}\!\to\!\keccak(node\|sib)$, $\mathsf{odd}\!\to\!\keccak(sib\|node)$, identical to the
+deployed \texttt{\_verifyMerkle}). The prover posts $\rho$ on-chain alongside its claimed output.
+\end{definition}
+
+\begin{definition}[Opening]
+To \emph{open} index $\ell$, the prover reveals $(A^{(\ell)},B^{(\ell)},C^{(\ell)})$ and the Merkle
+path $\pi_\ell$. The opening is \emph{included} iff folding $\mathsf{leaf}(A^{(\ell)},B^{(\ell)},C^{(\ell)})$ with
+$\pi_\ell$ under the index reproduces $\rho$.
+\end{definition}
+
+\begin{lemma}[Binding]\label{lem:binding}
+Under collision resistance of $\keccak$, an opening at index $\ell$ that is included under $\rho$
+reveals exactly the operands the prover committed at $\ell$: producing an included opening with any
+$(A',B',C')\neq(A^{(\ell)},B^{(\ell)},C^{(\ell)})$ requires a keccak collision.
+\end{lemma}
+\begin{proof}
+Inclusion forces $\mathsf{leaf}(A',B',C')$ to equal the committed leaf at $\ell$ (the Merkle path and
+index are fixed by $\rho$ and a second pre-image at any internal node is a collision). Equal leaves
+with distinct operands is a collision of $\keccak$ on the encoded operand string, since $\mathsf{enc}$
+is injective (fixed-width, length-prefixed). \qed
+\end{proof}
+
+\section{The challenger and end-to-end soundness}\label{sec:challenger}
+
+\begin{definition}[Beacon-bound challenge]
+Given a public, post-commitment beacon $\beta$ (\S\ref{sec:beacon}), the challenge for index $\ell$ is
+$r_{j,i} = \mathrm{BE}_{64}\big(\keccak(\sigma \,\|\, \mathrm{BE}_{32}(j) \,\|\, \mathrm{BE}_{64}(i))[0{:}8]\big)\bmod p$
+with seed $\sigma=\keccak(\beta\|\rho\|\mathrm{BE}_{64}(\ell))$, for $j<k$, $i<n$. Modeling $\keccak$ as a
+random oracle, the $r_j$ are uniform and independent in $\Fp^{\,n}$ and are fixed only \emph{after}
+$\rho$ is committed.
+\end{definition}
+
+\begin{definition}[$\mathsf{VerifyOpening}$, $\mathsf{ProvesFraud}$]
+$\mathsf{VerifyOpening}(\rho,\beta,\text{op}) = \mathsf{included}(\text{op},\rho) \wedge
+\mathsf{Freivalds}_k(A,B,C)$ with the beacon-bound challenge. The fraud predicate is its dual on the
+correctness bit: $\mathsf{ProvesFraud}=\mathsf{included}\wedge\neg\mathsf{Freivalds}_k$.
+\end{definition}
+
+\begin{theorem}[A fabricated matmul is provable]\label{thm:e2e}
+Suppose the prover's committed transcript contains, at some index $\ell$, a matmul with
+$C^{(\ell)}\neq A^{(\ell)}B^{(\ell)}$. Then a challenger that opens $\ell$ produces a witness for which
+$\mathsf{ProvesFraud}=\mathsf{true}$ except with probability $\leq (1/p)^k$ over the beacon. With
+$k=2$ and $p=2^{61}-1$ this failure probability is $\leq 2^{-122}$.
+\end{theorem}
+\begin{proof}
+The honest opening of $\ell$ is included (Lemma~\ref{lem:binding} gives inclusion for the committed
+operands), so $\mathsf{included}=\mathsf{true}$. Because $C^{(\ell)}\neq A^{(\ell)}B^{(\ell)}$,
+Lemma~\ref{lem:freivalds} gives $\Pr[\mathsf{Freivalds}_k=\mathsf{true}]\leq (1/p)^k$, hence
+$\neg\mathsf{Freivalds}_k$ holds except with that probability, and $\mathsf{ProvesFraud}=\mathsf{true}$.
+The beacon is drawn after $\rho$ is fixed, so the prover cannot have chosen $C^{(\ell)}$ to satisfy
+the specific challenge (the pre-fit attack of \S\ref{sec:beacon}). \qed
+\end{proof}
+
+\begin{corollary}[No-compute $\Rightarrow$ provable fraud]
+A permissionless watcher that re-executes the committed trace off-chain finds every index where
+$C^{(\ell)}\neq A^{(\ell)}B^{(\ell)}$ \emph{deterministically} (it recomputes $A^{(\ell)}B^{(\ell)}$ in
+the clear) and opens one. Thus any forward pass whose committed output was not actually computed
+contains at least one such $\ell$ and is slashable except with probability $\leq(1/p)^k$.
+\end{corollary}
+
+\begin{theorem}[An honest prover is never slashable]\label{thm:honest}
+If every committed matmul satisfies $C^{(\ell)}=A^{(\ell)}B^{(\ell)}$, then for every index $\ell$,
+every beacon $\beta$, and every (even adversarially chosen) opening submitted by a griefer,
+$\mathsf{ProvesFraud}=\mathsf{false}$.
+\end{theorem}
+\begin{proof}
+A griefer's opening either (i) reveals the committed operands, in which case
+$\mathsf{Freivalds}_k=\mathsf{true}$ by zero-false-reject (Lemma~\ref{lem:freivalds}), so
+$\neg\mathsf{Freivalds}_k=\mathsf{false}$; or (ii) reveals different operands, in which case
+$\mathsf{included}=\mathsf{false}$ except for a keccak collision (Lemma~\ref{lem:binding}). Either way
+$\mathsf{ProvesFraud}=\mathsf{included}\wedge\neg\mathsf{Freivalds}_k=\mathsf{false}$. \qed
+\end{proof}
+
+\section{Sound emission: the output is the committed value}\label{sec:forward}
+
+Theorems~\ref{thm:e2e}--\ref{thm:honest} bind \emph{committed matmuls}. They are only meaningful if the
+value the model \emph{returns} is determined by those matmuls. The \texttt{ProvableLinear} layer makes
+this hold by construction.
+
+\begin{definition}[Proof-bearing linear]
+For int8 weights $W\in[-127,127]^{\,o\times m}$ with public per-row dequant scales $s^W\in\mathbb{R}^o$,
+the layer on input $x\in\mathbb{R}^{t\times m}$ computes the per-row symmetric int8 quantization
+$(\bar x, s^x)=\mathsf{quant}(x)$ (deterministic: $s^x_r=\max_j|x_{rj}|/127$,
+$\bar x_{rj}=\mathrm{round}(x_{rj}/s^x_r)$), forms $C=\bar x\,W^\top$ on the exact $i64$ accumulator,
+commits $(\bar x, W^\top, C)$, and returns $y_{ro}=C_{ro}\,s^x_r\,s^W_o$.
+\end{definition}
+
+\begin{proposition}[Output binding]\label{prop:output}
+The returned $y$ is a fixed, public function $\mathsf{dequant}(\cdot)$ of the committed $C$ and the
+committed/public scales. Hence any party can recompute $y$ from the opened final-layer $C$ and reject
+a prover that claims a different output; and two honest executions emit byte-identical transcripts.
+\end{proposition}
+\begin{proof}
+$\mathsf{quant}$ and $\mathsf{dequant}$ are deterministic given $x$ and the public scales, and $C$ is
+the exact integer product (no floating-point reduction), so it is reproducible across backends.
+$y=\mathsf{dequant}(C)$ is then determined by the committed $C$; equality of two honest runs follows
+from determinism of every step. \qed
+\end{proof}
+
+\begin{remark}[Why exact integer, not a float shadow]
+A kernel that accumulates int8 block dots in \texttt{f32} (the common fast path) is non-associative and
+not bit-identical across hardware; committing its $i64$ ``shadow'' would commit a computation different
+from the returned value, breaking Proposition~\ref{prop:output}. \texttt{ProvableLinear} therefore
+\emph{is} the computation: the returned value is dequantized directly from the committed exact $C$. The
+throughput cost of the exact accumulator is the price of a reproducible proof and is paid only on
+proof-bearing inferences.
+\end{remark}
+
+\section{The post-commitment beacon}\label{sec:beacon}
+
+Soundness (Theorem~\ref{thm:e2e}) requires the challenge to be unpredictable when the prover chooses
+$C$. If the seed depended only on $\rho$ (which the prover knows), a prover could fabricate
+$C'=AB+\Delta$ with $\Delta r=0$ for the resulting $r$ and pass. We therefore bind the beacon to a
+value fixed \emph{after} the prover's commitment is mined: $\beta=\keccak(\mathsf{blockhash}(b_0)\,\|\,\mathsf{id})$
+where $b_0$ is the commitment's block. A transaction cannot contain its own block's hash, so a prover
+choosing $C$ before signing cannot predict $\beta$; $\mathsf{blockhash}$ is available for $256$ blocks,
+bounding the challenge window. The pre-fit attack is exactly attack~6 of the red-team battery
+(\S\ref{sec:impl}): a forgery tuned to a guessed $r_1$ is shown to pass $r_1$ and fail a fresh $r_2$.
+
+\section{On-chain enforcement, with no off-chain trust}\label{sec:onchain}
+
+The witness is checked in the EVM, not asserted by a watcher. Two implementations share one wire
+format and one field:
+\begin{itemize}[leftmargin=1.4em]
+\item \textbf{Reference (Solidity).} \texttt{ComputeWitnessLib.verifyOpening} runs Freivalds over $\Fp$
+via \texttt{mulmod}/\texttt{addmod} plus the Merkle fold and the beacon challenge, byte-identical to
+the prover. Cost is $O(tk+kn+tn)$ field ops --- affordable for a bounded slice; a full layer is
+challenged in slices.
+\item \textbf{Native (precompile).} \texttt{aivmbridge} at \texttt{0x0300\dots0004}, selector
+\texttt{0x12000000}, decodes the opening wire and calls the canonical Go verifier, returning
+$(\mathsf{included}\,|\,\mathsf{freivaldsOK}\!\ll\!1)$. Gas is $\text{base}+\text{(field ops)}\cdot c$,
+priced so a $256$-wide slice costs $\sim$1M gas and a $4096$-wide layer is unaffordable, forcing
+bounded slices; \texttt{RequiredGas} equals the metered consumption.
+\end{itemize}
+
+\begin{proposition}[Gate soundness]\label{prop:gate}
+The slash gate \texttt{OptimisticEvidence.challenge} transitions a commitment to \textsc{Fraudulent}
+and pays the bond to the caller \emph{iff} $\mathsf{ProvesFraud}$ holds for an opening under the
+committed root and the commit-block beacon. Consequently (Theorems~\ref{thm:e2e},~\ref{thm:honest}) a
+fabricated forward pass is slashable except with probability $\leq(1/p)^k$, and an honest prover is
+never slashable.
+\end{proposition}
+\begin{proof}
+By inspection the gate calls $\mathsf{ProvesFraud}$ with $\beta=\mathsf{blockhash}(\text{commitBlock})$
+and slashes exactly on its truth, within the open window (after which the commitment finalizes). The
+two theorems then transfer. \qed
+\end{proof}
+
+\section{Implementation and adversarial evidence}\label{sec:impl}
+
+Every definition and theorem above is realized in code, with the commitment, the field, the Merkle
+fold, and the challenge derivation \emph{byte-identical} across the prover, the watcher, the contract,
+and the precompile (enforced by a pinned cross-language golden vector that breaks one suite if either
+side drifts). The honest path is exercised on a real SwiGLU FFN forward; the adversarial path on a
+battery that instantiates each attack the theorems forbid.
+
+\begin{longtable}{@{}p{0.30\textwidth}p{0.50\textwidth}r@{}}
+\toprule
+Component & What it realizes & Tests \\
+\midrule
+\texttt{hanzo-engine/poi.rs} & exact matmul; keccak; Go-parity challenge derivation; Freivalds & \\
+\texttt{hanzo-engine/poi\_transcript.rs} & leaf, Merkle root/proof, \texttt{verify\_opening} (\S\ref{sec:transcript}--\ref{sec:challenger}) & \\
+\texttt{hanzo-engine/poi\_forward.rs} & \texttt{ProvableLinear}, \texttt{prove} (\S\ref{sec:forward}) & 18/18 \\
+\texttt{crypto/poi} (Go) & transcript + \texttt{VerifyOpening} + opening wire codec & pass \\
+\texttt{ComputeWitnessLib.sol} & on-chain Freivalds + Merkle + beacon (\S\ref{sec:onchain}) & 5/5 \\
+\texttt{OptimisticEvidence.sol} & the slash gate, \texttt{ProvesFraud}-driven (Prop.~\ref{prop:gate}) & 18/18 \\
+\texttt{aivmbridge} precompile & native verification, selector \texttt{0x12} & 5/5 \\
+\texttt{tests/poi\_adversarial.rs} & red-team battery (below) & pass \\
+\bottomrule
+\end{longtable}
+
+\paragraph{Red-team battery (each maps to a theorem).}
+\begin{enumerate}[leftmargin=1.6em,itemsep=1pt]
+\item Fabricate the final-layer output $\Rightarrow$ caught (Thm.~\ref{thm:e2e}).
+\item Fabricate a hidden intermediate matmul $\Rightarrow$ caught when opened; honest layers still verify.
+\item Sparse deep cheat (one wrong entry in a $256$-deep matmul) $\Rightarrow$ caught.
+\item Swap the output at open time $\Rightarrow$ Merkle inclusion fails (Lemma~\ref{lem:binding}).
+\item Tamper an input at open time $\Rightarrow$ inclusion fails (the leaf binds $A$).
+\item Pre-fit $C$ to a \emph{guessed} challenge $r_1$ $\Rightarrow$ passes $r_1$, fails the beacon-fresh
+$r_2$ (\S\ref{sec:beacon}).
+\item Griefer submits a fabricated opening not under the honest root $\Rightarrow$ cannot slash
+(Thm.~\ref{thm:honest}).
+\item Quantization lie (claim $y\neq\mathsf{dequant}(C)$) $\Rightarrow$ detectable by public recompute
+(Prop.~\ref{prop:output}).
+\item Determinism: two honest machines emit the byte-identical root (zero false reject).
+\item Honest forward verifies under \emph{every} beacon.
+\end{enumerate}
+
+\section{Scope: what is proven and what is assumed}
+
+\begin{itemize}[leftmargin=1.4em]
+\item \textbf{Proven (here, on code).} Per-matmul soundness end to end (Thm.~\ref{thm:e2e}); no-false-slash
+(Thm.~\ref{thm:honest}); output binding for the proof-bearing linear (Prop.~\ref{prop:output}); on-chain
+enforcement with native and reference verifiers (Prop.~\ref{prop:gate}); cross-language byte parity.
+\item \textbf{Assumed.} Collision/pre-image resistance and random-oracle behavior of $\keccak$; the
+field bound of Lemma~\ref{lem:freivalds} (companion); an honest majority of block producers for the
+$\mathsf{blockhash}$ beacon over the challenge window (a stronger VRF beacon strengthens this without
+changing the theorems).
+\item \textbf{Out of scope (named, not hidden).} The \emph{sequential-chaining} obligation --- that
+$A^{(\ell+1)}$ is the deterministic requantization of $\mathsf{dequant}(C^{(\ell)})$ --- is checked per
+link by recomputation but its full-graph composition (attention, MoE routing) is the subject of the
+companion extensions; confidentiality of the prompt is a separate envelope and is not claimed here.
+\end{itemize}
+
+\begin{thebibliography}{9}
+\bibitem{freivalds} R.~Freivalds, \emph{Probabilistic machines can use less running time}, IFIP
+Congress, 1977.
+\end{thebibliography}
+
+\end{document}
