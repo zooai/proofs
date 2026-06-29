@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/hero.svg" alt="proofs" width="880"></p>
+
 # Zoo Formal Proofs
 
 Machine-checked and paper proofs for the Zoo Labs Foundation stack:
