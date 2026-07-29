@@ -109,7 +109,8 @@ lean_lib Crypto where
     `Crypto.FHE.TFHE,
     `Crypto.Threshold.CGGMP21,
     `Crypto.Threshold.Composition,
-    `Crypto.Threshold.LSS
+    `Crypto.Threshold.LSS,
+    `Crypto.ZKSignature
   ]
 
 @[default_target]
@@ -192,6 +193,11 @@ lean_lib Warp where
     `Warp.Ordering,
     `Warp.Security
   ]
+
+@[default_target]
+lean_lib Main where
+  srcDir := "."
+  roots := #[`Main]
 
 @[default_target]
 lean_lib GPU where

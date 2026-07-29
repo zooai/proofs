@@ -1,77 +1,55 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Zoo formal verification — entry point.
 
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                        ZOO FORMAL VERIFICATION
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  `zoo_correctness` conjoins results proved elsewhere in this corpus. It holds
+  what it imports and nothing more, which is the only thing a top-level theorem
+  can honestly do: `lake build` succeeding here means Lean checked each
+  conjunct's proof, in its own module, from its own hypotheses.
 
-  Top-level correctness theorem for the Zoo Network (L2 on Lux).
+  Every conjunct below rests on Lean's ambient logic alone — no axiom of ours —
+  which `lean/axioms.py` reports per theorem. Deliberately absent:
 
-  If this file compiles, the following hold:
-  - Consensus is safe and live under BFT assumptions (from Lux L1)
-  - FROST/CGGMP21 threshold signatures are unforgeable
-  - Post-quantum crypto requires breaking all three NIST schemes
-  - FHE (CKKS/TFHE) preserves correctness under homomorphic ops
-  - T-Chain MPC replaces external signing services
-  - I-Chain DIDs replace external identity providers
-  - K-Chain key shares replace external KMS
-  - Cross-chain teleport conserves assets
-  - DeFi exchange preserves constant product invariant
-  - Authority only narrows through delegation
-  - DAO governance is Byzantine-robust (median aggregation)
-  - GPU EVM scales linearly for independent transactions
-  - GPU FHE achieves 40x bootstrap speedup (NTT parallelism)
-  - GPU consensus: BLS batch verify + Corona in parallel
-  - GPU DEX: independent pairs match simultaneously
+  - Safety and liveness. `Consensus.safety` composes two axioms;
+    `Consensus.Liveness.liveness` applies the axioms that are its argument.
+  - Threshold unforgeability, post-quantum hardness and FHE correctness. These
+    reduce to hardness axioms: the reductions are checked, the assumptions are
+    assumed.
+  - Anything about GPU throughput. A speedup is a measurement, not a theorem,
+    and belongs in a benchmark.
 
-  0 sorry across all files.
+  Zoo inherits Lux's consensus and cryptography models; `luxfi/proofs` is where
+  those are maintained.
 
-  Authors: Zach Kelling, Woo Bin
-  Zoo Labs Foundation
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Maps to: the modules imported below.
 -/
 
-import Mathlib.Data.Nat.Defs
-import Mathlib.Tactic
+import Consensus.BFT
+import Governance.ZIP
 
 namespace Zoo.Main
 
-/-- The Zoo Network is formally verified across 19 libraries:
-    Consensus, Crypto, DeFi, Bridge, Warp, Trust, Protocol,
-    Build, Compute, Network, Contract, Governance, AI, Agent,
-    Token, Data, Ecology, GPU.
+/-- Results this corpus proves outright, conjoined.
 
-    Zoo inherits Lux L1 proofs for consensus, cryptography,
-    and cross-chain security. Zoo-native proofs cover AI agents,
-    governance, and ecological applications.
-
-    All security properties hold simultaneously. -/
+    An earlier version stated eight conjuncts, of which six were arithmetic
+    facts about `Nat` presented as systems claims — `p * rate ≥ rate` as "GPU
+    EVM linear scaling", `cpu_time / speedup ≤ cpu_time` as "GPU FHE bootstrap
+    speedup", `pairs / cores ≤ pairs` as "GPU DEX pair parallelism",
+    `max a b ≤ a + b` as "hybrid finality", `t - 1 < t` as threshold secrecy —
+    and the eighth was `True`. Its header claimed a 40x FHE bootstrap speedup,
+    which no theorem here establishes. Each conjunct now names a theorem proved
+    in the module it comes from, applied rather than restated. -/
 theorem zoo_correctness :
-    -- 1. BFT quorum intersection (from Lux consensus): at the optimal
-    --    node count n = 3f+1, two 2f+1 quorums together exceed n.
-    (∀ n f : Nat, n = 3 * f + 1 → ∀ q1 q2 : Nat,
-      q1 ≥ 2 * f + 1 → q2 ≥ 2 * f + 1 → q1 + q2 > n) ∧
-    -- 2. Threshold t-of-n: fewer than t parties learn nothing
-    (∀ t n : Nat, t ≤ n → t ≥ 1 → n ≥ t → t - 1 < t) ∧
-    -- 3. Honest majority suffices for consensus
+    -- Quorum intersection: two quorums each above 2n/3, with f < n/3 faulty,
+    -- overlap in more than f nodes — so they share an honest one.
+    (∀ n f : Nat, f < n / 3 → ∀ q1 q2 : Nat,
+      q1 > 2 * n / 3 → q2 > 2 * n / 3 → q1 + q2 > n + f) ∧
+    -- An honest majority of 2f+1 in 3f+1 nodes clears that threshold.
     (∀ f : Nat, 0 < f → 2 * f + 1 > 2 * (3 * f + 1) / 3) ∧
-    -- 4. GPU EVM linear scaling (independent txns)
-    (∀ p rate : Nat, 0 < p → p * rate ≥ rate) ∧
-    -- 5. GPU FHE bootstrap speedup (never slower than CPU)
-    (∀ cpu_time speedup : Nat, 0 < speedup → cpu_time / speedup ≤ cpu_time) ∧
-    -- 6. GPU consensus hybrid finality (parallel ≤ sequential)
-    (∀ bls corona : Nat, max bls corona ≤ bls + corona) ∧
-    -- 7. GPU DEX pair parallelism
-    (∀ pairs cores : Nat, 0 < cores → pairs / cores ≤ pairs) ∧
-    -- 8. AMM output bounded by reserve
-    True := by
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, trivial⟩
-  · intro n f hf q1 q2 hq1 hq2; omega
-  · intro t n _ ht _; omega
-  · intro f hf; omega
-  · intro p rate hp; exact Nat.le_mul_of_pos_left rate hp
-  · intro cpu sp hsp; exact Nat.div_le_self cpu sp
-  · intro bls corona; omega
-  · intro pairs cores hc; exact Nat.div_le_self pairs cores
+    -- Governance: a proposal at or above quorum passes.
+    (∀ p : Governance.ZIP.Proposal, p.votesFor ≥ p.quorum → p.passes = true) :=
+  ⟨fun n f hf q1 q2 hq1 hq2 =>
+     Consensus.BFT.quorum_intersection n f hf q1 q2 hq1 hq2,
+   fun f hf => Consensus.BFT.honest_majority_sufficient f hf,
+   fun p h => Governance.ZIP.sufficient_votes_pass p h⟩
 
 end Zoo.Main
