@@ -1,10 +1,34 @@
 # Zoo Formal Verification
 
-21 machine-checked proofs for Zoo Network's critical systems.
+89 Lean files stating properties of Zoo Network's critical systems, containing
+595 theorems and lemmas, **116 axioms**, and 1 `sorry`.
 
-## Proof Inventory
+**These are not machine-checked.** No prover runs in this repository's CI — the
+one workflow deploys a website — and there is no build output here, so nothing
+below has been confirmed by Lean rather than merely written in it. An earlier
+version of this file called them "21 machine-checked proofs"; that was a
+stronger claim than the repository supports, and a reader who cloned and ran
+`lake build` would have discovered it before we did.
 
-### Lean 4 (14 proofs)
+**Some headline properties are axioms, not theorems.** `Contract/AMM.lean`
+appears in the table below as covering automated-market-maker solvency; the
+property itself, `swap_preserves_invariant`, is declared with `axiom` and its
+own comment says "stated as an axiom pending full mechanisation". An axiom is
+an assumption. Assuming the property you set out to prove is a legitimate step
+while the mechanisation is in progress, and it is not a proof of it.
+
+What this corpus is worth is real: 595 stated theorems is a specification of
+intended behaviour precise enough for a prover to check, which almost nothing
+in this industry has. What it is not yet is checked. The distinction is the
+whole value of the exercise, so this document states it first.
+
+Two things would change that, in order: run `lake build` in CI so the file
+fails when the proofs do, then discharge the axioms — starting with the ones
+named in tables as though they were results.
+
+## Inventory
+
+### Lean 4
 
 **AI Systems:**
 | Proof | Property |
