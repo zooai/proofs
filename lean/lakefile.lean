@@ -18,6 +18,7 @@ lean_lib Contract where
     `Contract.AMM
   ]
 
+@[default_target]
 lean_lib Governance where
   srcDir := "."
   roots := #[
@@ -29,6 +30,7 @@ lean_lib Governance where
     `Governance.DSO
   ]
 
+@[default_target]
 lean_lib AI where
   srcDir := "."
   roots := #[
@@ -41,6 +43,7 @@ lean_lib AI where
     `AI.SpeciesClassification
   ]
 
+@[default_target]
 lean_lib Agent where
   srcDir := "."
   roots := #[
@@ -54,18 +57,21 @@ lean_lib Agent where
     `Agent.RewardShaping
   ]
 
+@[default_target]
 lean_lib Token where
   srcDir := "."
   roots := #[
     `Token.ExperienceLedger
   ]
 
+@[default_target]
 lean_lib Data where
   srcDir := "."
   roots := #[
     `Data.Commons
   ]
 
+@[default_target]
 lean_lib Ecology where
   srcDir := "."
   roots := #[
@@ -74,6 +80,7 @@ lean_lib Ecology where
 
 -- Infrastructure proofs (from Lux — shared L1 foundation)
 
+@[default_target]
 lean_lib Consensus where
   srcDir := "."
   roots := #[
@@ -86,6 +93,7 @@ lean_lib Consensus where
     `Consensus.Quasar
   ]
 
+@[default_target]
 lean_lib Crypto where
   srcDir := "."
   roots := #[
@@ -104,6 +112,7 @@ lean_lib Crypto where
     `Crypto.Threshold.LSS
   ]
 
+@[default_target]
 lean_lib DeFi where
   srcDir := "."
   roots := #[
@@ -119,12 +128,14 @@ lean_lib DeFi where
     `DeFi.Router
   ]
 
+@[default_target]
 lean_lib Bridge where
   srcDir := "."
   roots := #[
     `Bridge.Teleport
   ]
 
+@[default_target]
 lean_lib Build where
   srcDir := "."
   roots := #[
@@ -134,18 +145,21 @@ lean_lib Build where
     `Build.Reproducibility
   ]
 
+@[default_target]
 lean_lib Compute where
   srcDir := "."
   roots := #[
     `Compute.CrossChain
   ]
 
+@[default_target]
 lean_lib Network where
   srcDir := "."
   roots := #[
     `Network.PeerDiscovery
   ]
 
+@[default_target]
 lean_lib Protocol where
   srcDir := "."
   roots := #[
@@ -161,6 +175,7 @@ lean_lib Protocol where
     `Protocol.Wave
   ]
 
+@[default_target]
 lean_lib Trust where
   srcDir := "."
   roots := #[
@@ -169,6 +184,7 @@ lean_lib Trust where
     `Trust.Vouch
   ]
 
+@[default_target]
 lean_lib Warp where
   srcDir := "."
   roots := #[
@@ -177,6 +193,7 @@ lean_lib Warp where
     `Warp.Security
   ]
 
+@[default_target]
 lean_lib GPU where
   srcDir := "."
   roots := #[
