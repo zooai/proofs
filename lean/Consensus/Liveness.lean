@@ -24,70 +24,12 @@
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Nat.Defs
 import Mathlib.Tactic
+import Consensus.Safety
 
-namespace Consensus
-
-/-!
-  Core consensus state model (shared with `Consensus.Safety`).
-
-  These structures mirror the definitions in `Consensus/Safety.lean`
-  (same field names) so the liveness theorem is stated over the exact
-  same state machine. They model the Lux consensus core:
-  - Nodes hold preferences and confidence counters.
-  - Finalization occurs once confidence reaches `beta` consecutive rounds.
--/
-
-/-- A value identifier (models ids.ID = [32]byte in Go) -/
-abbrev ValueId := Fin (2 ^ 256)
-
-/-- A node identifier (models types.NodeID) -/
-abbrev NodeId := Nat
-
-/-- Consensus parameters (models wave.Config) -/
-structure Params where
-  n     : Nat        -- total nodes
-  f     : Nat        -- max Byzantine nodes
-  k     : Nat        -- sample size per round (wave.Config.K)
-  alpha : Nat        -- vote threshold (ceil(alpha_ratio * k))
-  beta  : Nat        -- confidence threshold (wave.Config.Beta)
-  hf    : f < n / 3  -- BFT assumption
-  hk    : k ≤ n      -- cannot sample more than population
-  ha    : alpha ≤ k  -- threshold cannot exceed sample
-  hb    : 0 < beta   -- need at least 1 round for finality
-
-/-- Per-node state (models wave.WaveState + wave.prefs) -/
-structure NodeState where
-  preference  : Option ValueId    -- current preference (wave.prefs[item])
-  confidence  : Nat               -- consecutive confirming rounds (WaveState.Count)
-  finalized   : Option ValueId    -- decided value, if any
-  honest      : Bool              -- Byzantine or honest
-
-/-- Global consensus state -/
-structure ConsensusState (p : Params) where
-  round  : Nat
-  nodes  : Fin p.n → NodeState
-
-/-- A node has finalized a value -/
-def hasFinalized {p : Params} (s : ConsensusState p) (i : Fin p.n) (v : ValueId) : Prop :=
-  (s.nodes i).finalized = some v
-
-/-- A node is honest -/
-def isHonest {p : Params} (s : ConsensusState p) (i : Fin p.n) : Prop :=
-  (s.nodes i).honest = true
-
-/-- Count of honest nodes preferring value v -/
-noncomputable def honestPreferring {p : Params} (s : ConsensusState p) (v : ValueId) : Nat :=
-  Finset.card (Finset.filter
-    (fun i => (s.nodes i).honest = true ∧ (s.nodes i).preference = some v)
-    Finset.univ)
-
-/-- Count of honest nodes in the system -/
-noncomputable def honestCount {p : Params} (s : ConsensusState p) : Nat :=
-  Finset.card (Finset.filter
-    (fun i => (s.nodes i).honest = true)
-    Finset.univ)
-
-end Consensus
+-- The state machine is Consensus.Safety's, imported rather than restated.
+-- These declarations were duplicated here with the note that they "mirror"
+-- Safety's; mirrored types are distinct types, so the two modules could not
+-- be loaded together and the liveness theorem was stated over its own copy.
 
 namespace Consensus.Liveness
 
