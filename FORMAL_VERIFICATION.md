@@ -102,7 +102,7 @@ tamarin-prover RNSHybridHandshake.spthy
 
 ## Authors
 
-Antje Worring & Zach Kelling — Zoo Labs Foundation
+Antje Worring & Zoo Labs Foundation — Zoo Labs Foundation
 
 ## Links
 
