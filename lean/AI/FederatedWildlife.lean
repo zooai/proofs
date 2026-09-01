@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Federated Learning for Wildlife Monitoring — Convergence Properties
 
@@ -17,7 +17,7 @@
   - Convergence rate O(1/sqrt(T)) under data heterogeneity
   - (epsilon, delta)-differential privacy is preserved
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

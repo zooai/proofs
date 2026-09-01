@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Carbon Credit Conservation — Token Integrity
 
@@ -17,7 +17,7 @@
   - Retirement is irreversible: retired credits cannot be re-activated
   - Issuance is bounded by verified sequestration
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

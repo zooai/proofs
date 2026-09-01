@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Data Commons Access Control
 
@@ -16,7 +16,7 @@
   - Adding permissions never reduces access (monotonicity)
   - Revocation removes exactly the specified grants
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

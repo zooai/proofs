@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Peer Discovery and Network Topology
 
@@ -16,7 +16,7 @@
   - Bounded degree: max peer connections prevent resource exhaustion
   - Gossip convergence: information reaches all nodes in O(log n) rounds
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

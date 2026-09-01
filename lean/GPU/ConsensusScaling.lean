@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                  GPU CONSENSUS SCALING LAWS
@@ -16,7 +16,7 @@
   4. Validator set scaling with GPU batch verification
   5. Block production pipelining with GPU precomputation
 
-  Authors: Zach Kelling, Woo Bin
+  Authors: Zoo Labs Foundation Research, Woo Bin
   Zoo Labs Foundation
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 -/

@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                    GPU EVM SCALING LAWS
@@ -19,7 +19,7 @@
   These are the foundational scaling laws for any modern chain
   using GPU-accelerated smart contract execution.
 
-  Authors: Zach Kelling, Woo Bin
+  Authors: Zoo Labs Foundation Research, Woo Bin
   Zoo Labs Foundation
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 -/

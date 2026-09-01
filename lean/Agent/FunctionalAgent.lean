@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Functional/Compositional Agent Proofs
 
@@ -19,7 +19,7 @@
   - Monadic bind correctly sequences agent actions
   - Independent parallel agents commute
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

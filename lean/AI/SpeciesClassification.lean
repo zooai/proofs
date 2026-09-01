@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Species Classification Model Accuracy Bounds
 
@@ -17,7 +17,7 @@
   - Certified robustness radius for input perturbations
   - Ensemble of models improves error rate
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

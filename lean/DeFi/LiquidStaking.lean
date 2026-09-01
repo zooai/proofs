@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Liquid Staking and Yield Protocol
 
@@ -18,7 +18,7 @@
   - No impermanent loss on single-sided staking
   - Compounding: rewards auto-compound into staking position
 
-  Author: Zach Kelling (December 2025)
+  Author: Zoo Labs Foundation Research (December 2025)
 -/
 
 import Mathlib.Data.Nat.Defs

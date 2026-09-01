@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Experience Token Conservation Laws
 
@@ -18,7 +18,7 @@
   - Burning reduces total supply correctly
   - Transfers preserve total supply
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

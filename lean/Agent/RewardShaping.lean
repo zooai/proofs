@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Reward Shaping Proofs
 
@@ -17,7 +17,7 @@
   - Bounded rewards imply bounded value function
   - Shaped reward is consistent with original MDP ordering
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

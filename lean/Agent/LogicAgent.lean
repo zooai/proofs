@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Logic-Based Agent Proofs
 
@@ -19,7 +19,7 @@
   - BDI intentions persist until achieved or impossible
   - Adding beliefs doesn't invalidate existing conclusions
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Flash Loan Safety
 
@@ -12,7 +12,7 @@
   - Fee accrual: flash loan fee goes to LPs
   - No residual debt: loan is fully repaid or fully reverted
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Cross-Pool Order Router
 
@@ -11,7 +11,7 @@
   - Splitting: large orders split across pools for less slippage
   - Atomic: multi-pool route executes atomically or not at all
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

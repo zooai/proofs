@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   SLH-DSA (FIPS 205) Hash-Based Signature Correctness
 

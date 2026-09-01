@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Remote Sensing Data Integrity
 
@@ -16,7 +16,7 @@
   - Timestamp monotonicity: observation timestamps are monotonically increasing
   - Tamper evidence: any modification to imagery is detectable
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

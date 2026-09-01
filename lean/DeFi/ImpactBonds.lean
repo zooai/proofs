@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Conservation Impact Bonds — Financial Properties
 
@@ -17,7 +17,7 @@
   - Payout correctness: payout matches oracle-attested outcome
   - Principal preservation: early termination returns principal
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

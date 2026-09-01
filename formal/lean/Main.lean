@@ -16,7 +16,7 @@
 
   0 sorry across all files.
 
-  Authors: Zach Kelling, Woo Bin
+  Authors: Zoo Labs Foundation Research, Woo Bin
   Lux Industries Inc
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 -/

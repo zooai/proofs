@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Multi-Agent Emergence (Delta Soup)
 
@@ -20,7 +20,7 @@
   - Agent communication protocols converge
   - Total energy across agent interactions is conserved
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

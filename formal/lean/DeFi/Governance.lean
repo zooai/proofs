@@ -14,7 +14,7 @@
   - Bounded: parameters stay within safe ranges
   - Monotone: governance power ∝ stake
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

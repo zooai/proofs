@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Decentralized Science Organization (DSO) Governance
 
@@ -17,7 +17,7 @@
   - Conflicting proposals are mutually exclusive
   - Delegation preserves total voting weight
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

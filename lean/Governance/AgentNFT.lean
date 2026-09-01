@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Agent NFT Properties
 
@@ -17,7 +17,7 @@
   - Transferable: agent ownership can transfer
   - Revocable: compromised agents can be deactivated
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

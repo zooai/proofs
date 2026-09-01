@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Verkle Tree Correctness
 
@@ -15,7 +15,7 @@
   - Proof size: O(depth) elements, each O(1) (vs Merkle O(log n))
   - Batch proofs: multiple values in one proof
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

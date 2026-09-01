@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   On-Chain DEX Governance
 
@@ -16,7 +16,7 @@
   - Bounded: parameters stay within safe ranges
   - Monotone: governance power ∝ stake
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

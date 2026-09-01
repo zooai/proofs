@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Proof of AI (PoAI) Consensus Mechanism
 
@@ -18,7 +18,7 @@
   - Quorum intersection: any two quorums share an honest attester
   - Compute verification: valid attestation implies valid computation
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

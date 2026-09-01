@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   NFT-Bound Agent Ownership and Delegation
 
@@ -17,7 +17,7 @@
   - Revoking owner propagates to all delegates
   - No agent can exceed its granted capabilities (no escalation)
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

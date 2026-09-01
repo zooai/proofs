@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Energy-Based Model Agent Proofs
 
@@ -19,7 +19,7 @@
   - MCMC sampling reaches all energy modes given sufficient steps
   - Contrastive divergence approximation error bounded by k
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Embedding Correctness (7680-dimensional)
 
@@ -17,7 +17,7 @@
   - Determinism: same input → same embedding
   - Batching: batch embeddings preserve individual results
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

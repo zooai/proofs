@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                    GPU FHE SCALING LAWS
@@ -17,7 +17,7 @@
   4. Batch FHE amortizes bootstrap cost across ciphertexts
   5. Threshold FHE decryption scales with validator count
 
-  Authors: Zach Kelling, Woo Bin
+  Authors: Zoo Labs Foundation Research, Woo Bin
   Zoo Labs Foundation
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 -/

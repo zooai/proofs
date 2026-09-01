@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Agent Training Environment (Gym) Safety Properties
 
@@ -17,7 +17,7 @@
   - Reward function is consistent across episodes
   - Exploration strategy covers all reachable states
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

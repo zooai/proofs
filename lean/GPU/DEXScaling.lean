@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                    GPU DEX SCALING LAWS
@@ -17,7 +17,7 @@
   4. Price oracle aggregation: median computation on GPU
   5. ZAP binary protocol: GPU-native serialization
 
-  Authors: Zach Kelling, Woo Bin
+  Authors: Zoo Labs Foundation Research, Woo Bin
   Zoo Labs Foundation
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 -/

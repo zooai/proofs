@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Consensus Liveness Proof
 
@@ -71,7 +71,7 @@ axiom honest_sample_dominance :
       honestPreferring (trace (r + 1)) v > p.alpha
 
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   If honest nodes have a common preference after GST,
   they accumulate confidence monotonically.

@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Training-Free Group Relative Policy Optimization (TF-GRPO) Convergence
 
@@ -19,7 +19,7 @@
   - Policy converges to optimal under bounded variance
   - Training-free variant matches trained version asymptotically
 
-  Author: Zach Kelling
+  Author: Zoo Labs Foundation Research
 -/
 
 import Mathlib.Data.Nat.Defs

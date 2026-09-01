@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Consensus Safety Proof
 
@@ -87,7 +87,7 @@ noncomputable def honestCount {p : Params} (s : ConsensusState p) : Nat :=
     Finset.univ)
 
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Key invariant: once a node finalizes, its preference never changes.
   This models the early-return in wave.go:98-102:
@@ -98,7 +98,7 @@ axiom finalized_preference_stable :
     hasFinalized s i v → s'.round > s.round → hasFinalized s' i v
 
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Key invariant: finalization requires beta consecutive rounds with
   alpha-threshold majority. If alpha > 2k/3 and honest majority holds,
@@ -119,7 +119,7 @@ axiom unique_threshold :
     v1 = v2
 
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Finalization window overlap: if two nodes finalize in the same epoch,
   their beta-length confirmation windows must share at least one round.
@@ -136,7 +136,7 @@ axiom finalization_windows_overlap :
       honestCount s_overlap = honestCount s
 
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   Main Safety Theorem
 

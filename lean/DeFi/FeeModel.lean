@@ -1,5 +1,5 @@
 /-
-  Authors: Antje Worring, Zach Kelling
+  Authors: Antje Worring, Zoo Labs Foundation Research
 
   DeFi Fee Model
 
@@ -16,7 +16,7 @@
   - Validator revenue: portion of fees to validators
   - Permissionless: fee schedule is on-chain and transparent
 
-  Authors: Zach Kelling (Dec 2025), Woo Bin (Mar 2026)
+  Authors: Zoo Labs Foundation Research (Dec 2025), Woo Bin (Mar 2026)
 -/
 
 import Mathlib.Data.Nat.Defs
