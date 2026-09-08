@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: zoo-build-linux-amd64
+    runs-on: linux-amd64
     environment:
       name: production
       url: https://proofs.zoo.ngo
