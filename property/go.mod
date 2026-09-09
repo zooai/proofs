@@ -1,6 +1,6 @@
 module github.com/luxfi/formal/property
 
-go 1.26.4
+go 1.26.8
 
 require github.com/luxfi/fhe v1.8.8
 
