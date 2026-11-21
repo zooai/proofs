@@ -2,6 +2,8 @@
 
 # Zoo Formal Proofs
 
+[![Open in Hanzo](https://hanzo.app/badges/open-in-hanzo.svg)](https://hanzo.app/dev/open?repo=github.com/zooai/proofs&ref=main&action=open) [![Edit with Hanzo](https://hanzo.app/badges/edit-with-hanzo.svg)](https://hanzo.app/dev/open?repo=github.com/zooai/proofs&ref=main&action=edit)
+
 Machine-checked and paper proofs for the Zoo Labs Foundation stack:
 per-LLM training chains, the original 2021 Zoo NFT protocol, and
 homomorphic-DAO governance.
